@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import sys
+import importlib.util
 from pathlib import Path
 
 import joblib
@@ -54,7 +55,6 @@ from sklearn.metrics import (
     r2_score,
     recall_score,
 )
-from sklearn.model_selection import train_test_split
 
 # -----------------------------------------------------------------------------
 # Caminhos / estrutura de pastas (baseado em evasao.utils.paths)
@@ -93,6 +93,20 @@ CAMINHO_COMPARACAO_BASELINES_MD = DIR_RESULTADOS / "comparacao_baselines_tempora
 CAMINHO_FEATURE_IMPORTANCE_CSV = DIR_RESULTADOS / "feature_importance_random_forest.csv"
 CAMINHO_FEATURE_IMPORTANCE_MD = DIR_RESULTADOS / "feature_importance_random_forest.md"
 CAMINHO_METODOLOGIA_MD = DIR_RESULTADOS / "metodologia_temporal_antileakage.md"
+CAMINHO_DIAGNOSTICO_COMPLETUDE_CSV = (
+    DIR_RESULTADOS / "diagnostico_completude_temporal.csv"
+)
+CAMINHO_DIAGNOSTICO_COMPLETUDE_MD = (
+    DIR_RESULTADOS / "diagnostico_completude_temporal.md"
+)
+CAMINHO_DIAGNOSTICO_BALANCEAMENTO_CSV = (
+    DIR_RESULTADOS / "diagnostico_balanceamento_classes.csv"
+)
+CAMINHO_DIAGNOSTICO_BALANCEAMENTO_MD = (
+    DIR_RESULTADOS / "diagnostico_balanceamento_classes.md"
+)
+CAMINHO_SHAP_IMPORTANCE_CSV = DIR_RESULTADOS / "shap_importance_random_forest.csv"
+CAMINHO_SHAP_IMPORTANCE_MD = DIR_RESULTADOS / "shap_importance_random_forest.md"
 
 
 def _salvar_markdown_tabela(df: pd.DataFrame, caminho: Path, titulo: str) -> None:
@@ -121,9 +135,12 @@ def _calcular_metricas_modelo(
     mse = mean_squared_error(y_true, y_pred_arr)
     y_true_bin = (y_true >= threshold).astype(int)
     y_pred_bin = (np.clip(y_pred_arr, 0.0, 1.0) >= threshold).astype(int)
+    cm = confusion_matrix(y_true_bin, y_pred_bin, labels=[0, 1])
+    tn, fp, fn, tp = cm.ravel()
 
     return {
         "modelo": nome_modelo,
+        "threshold_binario": threshold,
         "r2": r2_score(y_true, y_pred_arr),
         "mae": mean_absolute_error(y_true, y_pred_arr),
         "rmse": float(np.sqrt(mse)),
@@ -132,6 +149,12 @@ def _calcular_metricas_modelo(
         "precision": precision_score(y_true_bin, y_pred_bin, zero_division=0),
         "recall": recall_score(y_true_bin, y_pred_bin, zero_division=0),
         "f1": f1_score(y_true_bin, y_pred_bin, zero_division=0),
+        "cm_tn": int(tn),
+        "cm_fp": int(fp),
+        "cm_fn": int(fn),
+        "cm_tp": int(tp),
+        "positivos_reais": int(y_true_bin.sum()),
+        "positivos_preditos": int(y_pred_bin.sum()),
     }
 
 
@@ -141,6 +164,245 @@ def _predizer_persistencia_evasao_t(X_test: pd.DataFrame, fallback: float) -> np
     evasao_t = 1 - (concluintes / ingressantes)
     evasao_t = evasao_t.replace([np.inf, -np.inf], np.nan).fillna(fallback)
     return np.clip(evasao_t.to_numpy(dtype=float), 0.0, 1.0)
+
+
+def _salvar_diagnostico_completude(
+    df_pre_dropna: pd.DataFrame,
+    df_pos_dropna: pd.DataFrame,
+    colunas_obrigatorias: list[str],
+) -> pd.DataFrame:
+    pre = (
+        df_pre_dropna.groupby("ano_base", dropna=False)
+        .size()
+        .reset_index(name="linhas_antes_dropna")
+    )
+    pos = (
+        df_pos_dropna.groupby("ano_base", dropna=False)
+        .size()
+        .reset_index(name="linhas_apos_dropna")
+    )
+    faltantes = (
+        df_pre_dropna.groupby("ano_base", dropna=False)[colunas_obrigatorias]
+        .agg(lambda serie: int(serie.isna().sum()))
+        .reset_index()
+        .rename(columns={col: f"faltantes_{col}" for col in colunas_obrigatorias})
+    )
+
+    diagnostico = pre.merge(pos, on="ano_base", how="left").merge(
+        faltantes,
+        on="ano_base",
+        how="left",
+    )
+    diagnostico["linhas_apos_dropna"] = (
+        diagnostico["linhas_apos_dropna"].fillna(0).astype(int)
+    )
+    diagnostico["linhas_perdidas"] = (
+        diagnostico["linhas_antes_dropna"] - diagnostico["linhas_apos_dropna"]
+    )
+    diagnostico["percentual_perda"] = np.where(
+        diagnostico["linhas_antes_dropna"] > 0,
+        diagnostico["linhas_perdidas"] / diagnostico["linhas_antes_dropna"],
+        0.0,
+    )
+    diagnostico = diagnostico.sort_values("ano_base").reset_index(drop=True)
+    diagnostico.to_csv(
+        CAMINHO_DIAGNOSTICO_COMPLETUDE_CSV,
+        index=False,
+        encoding="utf-8",
+    )
+
+    linhas = [
+        "# Diagnostico de Completude Temporal",
+        "",
+        "Este relatorio contabiliza quantas linhas existiam antes do `dropna`, "
+        "quantas sobreviveram depois do criterio de completude temporal e qual "
+        "foi o percentual de perda por `ano_base`.",
+        "",
+        "Nao foi aplicada imputacao automatica. A remocao por incompletude e "
+        "apenas diagnosticada para apoiar a discussao de ameacas a validade.",
+        "",
+    ]
+    linhas.append("| ano_base | antes_dropna | apos_dropna | linhas_perdidas | percentual_perda |")
+    linhas.append("| --- | ---: | ---: | ---: | ---: |")
+    for _, row in diagnostico.iterrows():
+        linhas.append(
+            "| "
+            f"{int(row['ano_base'])} | "
+            f"{int(row['linhas_antes_dropna'])} | "
+            f"{int(row['linhas_apos_dropna'])} | "
+            f"{int(row['linhas_perdidas'])} | "
+            f"{row['percentual_perda']:.2%} |"
+        )
+
+    linhas.extend(["", "## Ano-base 2020", ""])
+    diag_2020 = diagnostico[diagnostico["ano_base"] == 2020]
+    if diag_2020.empty:
+        linhas.append("O ano-base 2020 nao apareceu na base antes do `dropna`.")
+    else:
+        row_2020 = diag_2020.iloc[0]
+        linhas.append(
+            "Para `ano_base=2020`, havia "
+            f"{int(row_2020['linhas_antes_dropna'])} linhas antes do `dropna` e "
+            f"{int(row_2020['linhas_apos_dropna'])} linhas apos o `dropna`, "
+            f"com perda de {row_2020['percentual_perda']:.2%}."
+        )
+        linhas.append("")
+        linhas.append("Faltantes por coluna obrigatoria em 2020:")
+        for col in colunas_obrigatorias:
+            col_diag = f"faltantes_{col}"
+            linhas.append(f"- `{col}`: {int(row_2020[col_diag])}")
+
+    CAMINHO_DIAGNOSTICO_COMPLETUDE_MD.write_text(
+        "\n".join(linhas) + "\n",
+        encoding="utf-8",
+    )
+    print(f"Diagnóstico de completude salvo em: {CAMINHO_DIAGNOSTICO_COMPLETUDE_CSV}")
+    print(f"Diagnóstico de completude Markdown salvo em: {CAMINHO_DIAGNOSTICO_COMPLETUDE_MD}")
+    return diagnostico
+
+
+def _salvar_diagnostico_balanceamento(
+    y_total: pd.Series,
+    y_train: pd.Series,
+    y_test: pd.Series,
+    threshold: float,
+) -> pd.DataFrame:
+    linhas = []
+    for nome, serie in [
+        ("total_pos_dropna", y_total),
+        ("treino", y_train),
+        ("teste", y_test),
+    ]:
+        y_bin = (serie >= threshold).astype(int)
+        total = int(len(y_bin))
+        baixa = int((y_bin == 0).sum())
+        alta = int((y_bin == 1).sum())
+        prop_baixa = baixa / total if total else 0.0
+        prop_alta = alta / total if total else 0.0
+        classe_majoritaria = "baixa_evasao" if prop_baixa >= prop_alta else "alta_evasao"
+        baseline_majoritario = max(prop_baixa, prop_alta)
+        linhas.append(
+            {
+                "conjunto": nome,
+                "threshold_binario": threshold,
+                "total_linhas": total,
+                "qtd_baixa_evasao": baixa,
+                "qtd_alta_evasao": alta,
+                "prop_baixa_evasao": prop_baixa,
+                "prop_alta_evasao": prop_alta,
+                "classe_majoritaria": classe_majoritaria,
+                "baseline_majoritario_accuracy": baseline_majoritario,
+            }
+        )
+
+    diagnostico = pd.DataFrame(linhas)
+    diagnostico.to_csv(
+        CAMINHO_DIAGNOSTICO_BALANCEAMENTO_CSV,
+        index=False,
+        encoding="utf-8",
+    )
+
+    linhas_md = [
+        "# Diagnostico de Balanceamento das Classes",
+        "",
+        "A classificacao binaria foi derivada da taxa continua usando o threshold "
+        f"`{threshold:.2f}`. Este diagnostico existe para evitar que a acuracia "
+        "seja interpretada isoladamente em cenarios desbalanceados.",
+        "",
+        "| conjunto | total | baixa_evasao | alta_evasao | prop_baixa | prop_alta | baseline_majoritario |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for _, row in diagnostico.iterrows():
+        linhas_md.append(
+            "| "
+            f"{row['conjunto']} | {int(row['total_linhas'])} | "
+            f"{int(row['qtd_baixa_evasao'])} | {int(row['qtd_alta_evasao'])} | "
+            f"{row['prop_baixa_evasao']:.2%} | {row['prop_alta_evasao']:.2%} | "
+            f"{row['baseline_majoritario_accuracy']:.2%} |"
+        )
+    linhas_md.extend(
+        [
+            "",
+            "## Interpretacao",
+            "",
+            "Acuracia nao deve ser usada como argumento principal quando uma classe "
+            "domina o conjunto de teste. Para a discussao academica, priorize F1, "
+            "precision, recall e a matriz de confusao.",
+        ]
+    )
+    CAMINHO_DIAGNOSTICO_BALANCEAMENTO_MD.write_text(
+        "\n".join(linhas_md) + "\n",
+        encoding="utf-8",
+    )
+    print(f"Diagnóstico de balanceamento salvo em: {CAMINHO_DIAGNOSTICO_BALANCEAMENTO_CSV}")
+    print(f"Diagnóstico de balanceamento Markdown salvo em: {CAMINHO_DIAGNOSTICO_BALANCEAMENTO_MD}")
+    return diagnostico
+
+
+def _salvar_feature_importance_markdown(
+    feature_importance: pd.DataFrame,
+    caminho: Path,
+    shap_status: str,
+) -> None:
+    top_feature = feature_importance.iloc[0]["feature"]
+    linhas = [
+        "# Importancia das Variaveis - Random Forest Temporal",
+        "",
+        "O ranking abaixo foi calculado com `feature_importances_` do Random Forest "
+        "treinado no mesmo holdout temporal dos baselines.",
+        "",
+        "Interpretacao curta: maior importancia indica maior participacao da variavel "
+        "nas divisoes das arvores. Isso nao implica causalidade e deve ser lido como "
+        "evidencia associativa sobre dados agregados por curso.",
+        "",
+        f"Variavel mais importante nesta execucao: `{top_feature}`.",
+        "",
+        shap_status,
+        "",
+        "| rank | feature | importance |",
+        "| ---: | --- | ---: |",
+    ]
+    for _, row in feature_importance.iterrows():
+        linhas.append(
+            f"| {int(row['rank'])} | {row['feature']} | {row['importance']:.6f} |"
+        )
+    caminho.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+
+
+def _gerar_shap_opcional(
+    modelo_rf: RandomForestRegressor,
+    X_test: pd.DataFrame,
+) -> str:
+    if importlib.util.find_spec("shap") is None:
+        return "SHAP nao foi executado porque o pacote `shap` nao esta instalado."
+
+    try:
+        import shap  # type: ignore
+
+        amostra = X_test.sample(min(len(X_test), 500), random_state=42)
+        explainer = shap.TreeExplainer(modelo_rf)
+        shap_values = explainer.shap_values(amostra)
+        shap_importance = (
+            pd.DataFrame(
+                {
+                    "feature": amostra.columns,
+                    "mean_abs_shap": np.abs(shap_values).mean(axis=0),
+                }
+            )
+            .sort_values("mean_abs_shap", ascending=False)
+            .reset_index(drop=True)
+        )
+        shap_importance.insert(0, "rank", range(1, len(shap_importance) + 1))
+        shap_importance.to_csv(CAMINHO_SHAP_IMPORTANCE_CSV, index=False, encoding="utf-8")
+        _salvar_markdown_tabela(
+            shap_importance,
+            CAMINHO_SHAP_IMPORTANCE_MD,
+            "SHAP Opcional - Random Forest Temporal",
+        )
+        print(f"SHAP opcional salvo em: {CAMINHO_SHAP_IMPORTANCE_CSV}")
+        return f"SHAP opcional executado em amostra de {len(amostra)} linhas."
+    except Exception as exc:
+        return f"SHAP estava disponivel, mas a analise opcional falhou: {exc}"
 
 
 def _salvar_documentacao_metodologica() -> None:
@@ -158,10 +420,20 @@ O dataset atual usa variáveis disponíveis no ano-base t para prever
 `taxa_evasao_alvo` no ano t+1. O holdout temporal é fixo: treino com
 `ano_base <= 2018` e teste com `ano_base > 2018`.
 
+As features `ingressantes_t`, `concluintes_t`, `matriculados_t`,
+`vagas_totais_t` e `inscritos_totais_t` pertencem ao ano-base t. O uso de
+`concluintes_t` pressupõe cenário operacional após o fechamento anual do
+ano-base; para decisões durante o ano corrente, essa variável deve ser removida
+ou substituída por variável parcial disponível no momento da decisão.
+
 ## Variáveis Proibidas
 
-`taxa_conclusao_alvo`, `ingressantes_alvo`, `concluintes_alvo` e quaisquer
-variáveis futuras ou derivadas diretamente do alvo não podem entrar em X.
+`taxa_evasao_alvo`, `taxa_conclusao_alvo`, `ingressantes_alvo`,
+`concluintes_alvo`, `matriculados_alvo` e quaisquer variáveis futuras ou
+derivadas diretamente do alvo não podem entrar em X.
+
+`dados_ingresso_evasao_conclusao.csv` é base descritiva/EDA. A modelagem
+preditiva principal usa `dados_modelagem_temporal_sbie.csv`.
 
 ## Papel dos Baselines
 
@@ -174,6 +446,12 @@ Os baselines tornam a comparação auditável:
 
 O Random Forest só deve ser defendido cientificamente quando superar esses
 baselines no mesmo holdout temporal.
+
+## Diagnósticos adicionais
+
+O pipeline também salva diagnósticos de completude temporal e balanceamento de
+classes. O ano-base 2020 é diagnosticado explicitamente quando desaparece após
+o `dropna`; não há imputação automática sem decisão metodológica.
 """
     CAMINHO_METODOLOGIA_MD.write_text(texto, encoding="utf-8")
     print(f"Documentação metodológica salva em: {CAMINHO_METODOLOGIA_MD}")
@@ -247,7 +525,7 @@ def treinar_modelos(
     }
 
     # ------------------------------------------------------------------
-    # 1) Treinamento para prever ingressantes e concluintes
+    # 1) Base auxiliar/descritiva
     # ------------------------------------------------------------------
     if all(
         col in df_baseline.columns
@@ -259,63 +537,19 @@ def treinar_modelos(
             "concluintes",
         ]
     ):
-        print("Treinando modelos para ingressantes e concluintes...")
-
-        # Features e targets para previsões de ingressantes e concluintes
-        X = df_baseline[["numero_cursos", "vagas_totais", "inscritos_totais"]]
-        y_ingressantes = df_baseline["ingressantes"]
-        y_concluintes = df_baseline["concluintes"]
-
-        # Divisão dos dados para ingressantes
-        X_train_ing, X_test_ing, y_train_ing, y_test_ing = train_test_split(
-            X, y_ingressantes, test_size=0.2, random_state=42
+        print(
+            "Base dados_ingresso_evasao_conclusao.csv carregada apenas para "
+            "auditoria/EDA descritiva; ela não entra na modelagem preditiva principal."
         )
-
-        # Modelo Random Forest para ingressantes
-        modelo_ingressantes = RandomForestRegressor(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf,
-            random_state=42,
-        )
-        modelo_ingressantes.fit(X_train_ing, y_train_ing)
-        score_ingressantes = modelo_ingressantes.score(X_test_ing, y_test_ing)
-        print(f"Score R² para ingressantes (Random Forest): {score_ingressantes:.4f}")
-
-        # Divisão dos dados para concluintes
-        X_train_conc, X_test_conc, y_train_conc, y_test_conc = train_test_split(
-            X, y_concluintes, test_size=0.2, random_state=42
-        )
-
-        # Modelo Random Forest para concluintes
-        modelo_concluintes = RandomForestRegressor(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            min_samples_split=min_samples_split,
-            min_samples_leaf=min_samples_leaf,
-            random_state=42,
-        )
-        modelo_concluintes.fit(X_train_conc, y_train_conc)
-        score_concluintes = modelo_concluintes.score(X_test_conc, y_test_conc)
-        print(f"Score R² para concluintes (Random Forest): {score_concluintes:.4f}")
-
-        # Salvar modelos de ingressantes e concluintes
-        caminho_modelo_ing = CAMINHO_MODELO_INGRESSANTES
-        caminho_modelo_conc = CAMINHO_MODELO_CONCLUINTES
-        joblib.dump(modelo_ingressantes, caminho_modelo_ing)
-        joblib.dump(modelo_concluintes, caminho_modelo_conc)
-
-        resultados["modelos_ingressantes_concluintes"] = {
-            "score_r2_ingressantes": score_ingressantes,
-            "score_r2_concluintes": score_concluintes,
-            "caminho_modelo_ingressantes": str(caminho_modelo_ing),
-            "caminho_modelo_concluintes": str(caminho_modelo_conc),
+        resultados["base_descritiva"] = {
+            "arquivo": str(caminho_dados_baseline),
+            "linhas": int(len(df_baseline)),
+            "uso": "EDA/descritivo; nao usado como X para taxa_evasao_alvo",
         }
     else:
         print(
-            "Aviso: colunas para ingressantes/concluintes não encontradas. "
-            "Pulando etapa de modelos de ingresso/conclusão."
+            "Aviso: colunas da base descritiva não encontradas. "
+            "Prosseguindo somente com a base temporal SBIE."
         )
 
     # ------------------------------------------------------------------
@@ -334,6 +568,7 @@ def treinar_modelos(
 
     colunas_relevantes = feature_cols + ["taxa_evasao_alvo", "ano_base", "ano_alvo"]
     df_reg = df[colunas_relevantes].copy()
+    df_reg_pre_dropna = df_reg.copy()
 
     print("\nResumo pré-dropna por ano_base:")
     dist_pre = (
@@ -350,6 +585,11 @@ def treinar_modelos(
     # Remove linhas sem histórico temporal completo ou sem alvo
     df_reg = df_reg.dropna(
         subset=feature_cols + ["taxa_evasao_alvo", "ano_base", "ano_alvo"]
+    )
+    diagnostico_completude = _salvar_diagnostico_completude(
+        df_reg_pre_dropna,
+        df_reg,
+        feature_cols + ["taxa_evasao_alvo", "ano_alvo"],
     )
 
     ano_limite_treino = 2018
@@ -432,6 +672,12 @@ def treinar_modelos(
     y_train = df_treino["taxa_evasao_alvo"]
     X_test = df_teste[feature_cols]
     y_test = df_teste["taxa_evasao_alvo"]
+    diagnostico_balanceamento = _salvar_diagnostico_balanceamento(
+        df_reg["taxa_evasao_alvo"],
+        y_train,
+        y_test,
+        threshold_evasao_alta,
+    )
 
     # Baseline 1: média histórica do treino
     media_historica_treino = float(y_train.mean())
@@ -525,10 +771,11 @@ def treinar_modelos(
         index=False,
         encoding="utf-8",
     )
-    _salvar_markdown_tabela(
+    shap_status = _gerar_shap_opcional(modelo_rf, X_test)
+    _salvar_feature_importance_markdown(
         feature_importance,
         CAMINHO_FEATURE_IMPORTANCE_MD,
-        "Importancia das Variaveis - Random Forest Temporal",
+        shap_status,
     )
     _salvar_documentacao_metodologica()
 
@@ -557,6 +804,8 @@ def treinar_modelos(
     print(f"Métricas comparativas Markdown salvas em: {CAMINHO_COMPARACAO_BASELINES_MD}")
     print(f"Feature importance salva em: {CAMINHO_FEATURE_IMPORTANCE_CSV}")
     print(f"Feature importance Markdown salva em: {CAMINHO_FEATURE_IMPORTANCE_MD}")
+    print(f"Diagnóstico de completude salvo em: {CAMINHO_DIAGNOSTICO_COMPLETUDE_CSV}")
+    print(f"Diagnóstico de balanceamento salvo em: {CAMINHO_DIAGNOSTICO_BALANCEAMENTO_CSV}")
 
     resultados["modelo_evasao_regressao"] = {
         "mae_linear": mae_linear,
@@ -578,6 +827,16 @@ def treinar_modelos(
         "caminho_md": str(CAMINHO_FEATURE_IMPORTANCE_MD),
     }
     resultados["documentacao_metodologica"] = str(CAMINHO_METODOLOGIA_MD)
+    resultados["diagnostico_completude_temporal"] = {
+        "resumo": diagnostico_completude.to_dict(orient="records"),
+        "caminho_csv": str(CAMINHO_DIAGNOSTICO_COMPLETUDE_CSV),
+        "caminho_md": str(CAMINHO_DIAGNOSTICO_COMPLETUDE_MD),
+    }
+    resultados["diagnostico_balanceamento_classes"] = {
+        "resumo": diagnostico_balanceamento.to_dict(orient="records"),
+        "caminho_csv": str(CAMINHO_DIAGNOSTICO_BALANCEAMENTO_CSV),
+        "caminho_md": str(CAMINHO_DIAGNOSTICO_BALANCEAMENTO_MD),
+    }
 
     # ------------------------------------------------------------------
     # 3) Análise binária da evasão (matriz de confusão + métricas)
@@ -588,9 +847,9 @@ def treinar_modelos(
     # Geração da Matriz de Confusão (binarizando a taxa de evasão com threshold parametrizado)
     threshold = threshold_evasao_alta
     y_test_class = (y_test >= threshold).astype(int)
-    y_pred_class = (melhor_modelo.predict(X_test) >= threshold).astype(int)
+    y_pred_class = (np.clip(melhor_modelo.predict(X_test), 0.0, 1.0) >= threshold).astype(int)
 
-    cm = confusion_matrix(y_test_class, y_pred_class)
+    cm = confusion_matrix(y_test_class, y_pred_class, labels=[0, 1])
     acc = accuracy_score(y_test_class, y_pred_class)
     prec = precision_score(y_test_class, y_pred_class, zero_division=0)
     rec = recall_score(y_test_class, y_pred_class, zero_division=0)
@@ -632,12 +891,22 @@ def treinar_modelos(
         f.write(f"Feature importance CSV: {CAMINHO_FEATURE_IMPORTANCE_CSV}\n")
         f.write(f"Feature importance Markdown: {CAMINHO_FEATURE_IMPORTANCE_MD}\n")
         f.write(f"Documentação metodológica: {CAMINHO_METODOLOGIA_MD}\n\n")
+        f.write(f"Diagnóstico de completude CSV: {CAMINHO_DIAGNOSTICO_COMPLETUDE_CSV}\n")
+        f.write(f"Diagnóstico de completude Markdown: {CAMINHO_DIAGNOSTICO_COMPLETUDE_MD}\n")
+        f.write(f"Diagnóstico de balanceamento CSV: {CAMINHO_DIAGNOSTICO_BALANCEAMENTO_CSV}\n")
+        f.write(
+            f"Diagnóstico de balanceamento Markdown: {CAMINHO_DIAGNOSTICO_BALANCEAMENTO_MD}\n\n"
+        )
 
         f.write(f"=== Classificação binária da evasão (threshold {threshold:.2f}) ===\n")
         f.write(f"Acurácia: {acc:.4f}\n")
         f.write(f"Precisão: {prec:.4f}\n")
         f.write(f"Recall:   {rec:.4f}\n")
         f.write(f"F1-score: {f1:.4f}\n\n")
+        f.write(
+            "Aviso metodológico: acurácia não deve ser o argumento principal "
+            "quando há desbalanceamento; priorize F1, precisão, recall e matriz de confusão.\n\n"
+        )
 
         f.write("Matriz de confusão:\n")
         f.write(str(cm) + "\n\n")
@@ -683,6 +952,12 @@ def treinar_modelos(
     )
     resultados["caminhos"]["feature_importance_csv"] = str(CAMINHO_FEATURE_IMPORTANCE_CSV)
     resultados["caminhos"]["metodologia_temporal"] = str(CAMINHO_METODOLOGIA_MD)
+    resultados["caminhos"]["diagnostico_completude_csv"] = str(
+        CAMINHO_DIAGNOSTICO_COMPLETUDE_CSV
+    )
+    resultados["caminhos"]["diagnostico_balanceamento_csv"] = str(
+        CAMINHO_DIAGNOSTICO_BALANCEAMENTO_CSV
+    )
 
     # ------------------------------------------------------------------
     # 4) Treinamento de modelos de evasão por subconjuntos de variáveis
@@ -752,13 +1027,9 @@ def treinar_modelos(
             if df_treino_sub.empty or df_teste_sub.empty:
                 print(
                     f"Aviso: split temporal por ano_base não pôde ser aplicado para '{nome_sub}'. "
-                    "Usando hold-out aleatório."
+                    "Subconjunto pulado para evitar hold-out aleatório em base temporal."
                 )
-                X_sub = df_sub[cols_validas]
-                y_sub = df_sub["taxa_evasao_alvo"]
-                X_train_sub, X_test_sub, y_train_sub, y_test_sub = train_test_split(
-                    X_sub, y_sub, test_size=0.2, random_state=42
-                )
+                continue
             else:
                 print(
                     f"Split temporal para '{nome_sub}': treino até ano_base {ano_limite_treino_sub}, "
@@ -771,13 +1042,9 @@ def treinar_modelos(
         else:
             print(
                 f"Aviso: coluna 'ano_base' não encontrada em df_sub ({nome_sub}). "
-                "Usando hold-out aleatório."
+                "Subconjunto pulado para evitar hold-out aleatório em base temporal."
             )
-            X_sub = df_sub[cols_validas]
-            y_sub = df_sub["taxa_evasao_alvo"]
-            X_train_sub, X_test_sub, y_train_sub, y_test_sub = train_test_split(
-                X_sub, y_sub, test_size=0.2, random_state=42
-            )
+            continue
 
         # Modelo 1: Regressão Linear
         modelo_linear_sub = LinearRegression()
@@ -811,8 +1078,10 @@ def treinar_modelos(
 
         # Classificação binária para o subconjunto (mesmo limiar da parte geral)
         y_test_class_sub = (y_test_sub >= threshold).astype(int)
-        y_pred_class_sub = (melhor_sub.predict(X_test_sub) >= threshold).astype(int)
-        cm_sub = confusion_matrix(y_test_class_sub, y_pred_class_sub)
+        y_pred_class_sub = (
+            np.clip(melhor_sub.predict(X_test_sub), 0.0, 1.0) >= threshold
+        ).astype(int)
+        cm_sub = confusion_matrix(y_test_class_sub, y_pred_class_sub, labels=[0, 1])
         acc_sub = accuracy_score(y_test_class_sub, y_pred_class_sub)
         prec_sub = precision_score(
             y_test_class_sub, y_pred_class_sub, zero_division=0
@@ -897,8 +1166,7 @@ def carregar_ou_treinar_modelos_streamlit(
     - Se não existirem (como no deploy do Streamlit Cloud),
       chama treinar_modelos(...) em tempo de execução, que:
         * lê o CSV principal em dados/processado/dados_modelagem_temporal_sbie.csv
-        * treina todos os modelos (ingressantes, concluintes, evasão geral
-          e subconjuntos)
+        * treina o modelo temporal de evasão geral e subconjuntos
         * salva os .pkl em modelos/modelos_salvos/
       e, em seguida, carrega os .pkl recém-criados.
 
@@ -906,8 +1174,6 @@ def carregar_ou_treinar_modelos_streamlit(
     """
 
     caminhos_esperados = {
-        "modelo_ingressantes": CAMINHO_MODELO_INGRESSANTES,
-        "modelo_concluintes": CAMINHO_MODELO_CONCLUINTES,
         "modelo_melhor_evasao": CAMINHO_MODELO_MELHOR,
         "modelo_evasao_oferta_demanda": CAMINHO_MODELO_OFERTA,
         "modelo_evasao_fluxo_academico": CAMINHO_MODELO_FLUXO,

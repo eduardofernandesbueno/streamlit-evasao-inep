@@ -161,6 +161,10 @@ modelos/resultados_modelos/
 !modelos/resultados_modelos/feature_importance_random_forest.csv
 !modelos/resultados_modelos/feature_importance_random_forest.md
 !modelos/resultados_modelos/metodologia_temporal_antileakage.md
+!modelos/resultados_modelos/diagnostico_completude_temporal.csv
+!modelos/resultados_modelos/diagnostico_completude_temporal.md
+!modelos/resultados_modelos/diagnostico_balanceamento_classes.csv
+!modelos/resultados_modelos/diagnostico_balanceamento_classes.md
 
 *.pkl
 *.joblib
@@ -178,6 +182,7 @@ modelos/resultados_modelos/*.jpg
 # =========================================================
 
 notebooks/
+experimentos/
 .ipynb_checkpoints/
 
 # =========================================================

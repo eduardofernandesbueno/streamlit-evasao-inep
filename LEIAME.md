@@ -179,5 +179,38 @@ feature. Os testes em `tests/` protegem esse contrato anti-leakage.
 A etapa de modelagem salva os artefatos de auditoria em `modelos/resultados_modelos/`:
 - `comparacao_baselines_temporal.csv` e `.md`: média histórica, persistência,
   Regressão Linear e Random Forest no mesmo holdout temporal;
+- `diagnostico_completude_temporal.csv` e `.md`: contagem antes/depois do
+  `dropna` por `ano_base`, incluindo diagnóstico explícito de 2020;
+- `diagnostico_balanceamento_classes.csv` e `.md`: proporções das classes baixa
+  e alta evasão e baseline majoritário;
 - `feature_importance_random_forest.csv` e `.md`: ranking de importância do RF;
 - `metodologia_temporal_antileakage.md`: nota curta para revisão metodológica.
+
+Riscos metodológicos mitigados
+
+- Leakage temporal: treino usa `ano_base <= 2018` e teste usa `ano_base > 2018`.
+- Alvo determinístico: `taxa_conclusao`, `taxa_evasao` e colunas derivadas do
+  alvo não entram como features preditivas.
+- Avaliação no mesmo conjunto: baselines e Random Forest usam o mesmo holdout
+  temporal e o mesmo `y_test`.
+- Ausência de baseline: média histórica, persistência, Regressão Linear e
+  Random Forest são comparados lado a lado.
+
+Hipóteses operacionais e limitações
+
+- `dados_ingresso_evasao_conclusao.csv` é base descritiva/EDA; a modelagem
+  preditiva usa `dados_modelagem_temporal_sbie.csv`.
+- `concluintes_t` só é válido após o fechamento do ano-base t. Para decisões
+  durante o ano corrente, deve ser removido ou substituído por variável parcial
+  disponível no momento da decisão.
+- O modelo ainda não inclui variáveis socioeconômicas ou exógenas.
+- `ano_base=2020` pode desaparecer após o critério de completude; isso é
+  diagnosticado, não imputado automaticamente.
+- As classes binárias podem ser desbalanceadas; acurácia é auxiliar. Priorize
+  F1, precisão, recall e matriz de confusão.
+- O ganho do RF é moderado, não perfeito, porque agora a tarefa é predição
+  temporal real, não reconstrução de fórmula.
+- Os dados são agregados por curso, não por indivíduo.
+
+Consulte `docs/metodologia_modelagem_temporal.md` para a nota técnica voltada à
+revisão SBIE/RBIE.

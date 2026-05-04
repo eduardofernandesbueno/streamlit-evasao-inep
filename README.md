@@ -224,5 +224,41 @@ The modeling step writes audit artifacts under `modelos/resultados_modelos/`:
 
 - `comparacao_baselines_temporal.csv` and `.md`: historical mean, persistence,
   Linear Regression, and Random Forest compared on the same temporal holdout;
+- `diagnostico_completude_temporal.csv` and `.md`: before/after `dropna`
+  counts by `ano_base`, including the explicit 2020 diagnostic;
+- `diagnostico_balanceamento_classes.csv` and `.md`: low/high dropout class
+  proportions and majority-class baseline;
 - `feature_importance_random_forest.csv` and `.md`: Random Forest feature ranking;
 - `metodologia_temporal_antileakage.md`: short methodological note for review.
+
+---------------------------------
+Riscos metodológicos mitigados
+
+- Temporal leakage: training uses `ano_base <= 2018` and testing uses
+  `ano_base > 2018`.
+- Deterministic target reconstruction: contemporaneous `taxa_conclusao`,
+  `taxa_evasao` and target-derived columns are not used as predictive features.
+- Evaluation on the same set: all baselines and Random Forest use the same
+  temporal holdout and the same `y_test`.
+- Missing baseline comparison: historical mean, persistence, Linear Regression
+  and Random Forest are reported side by side.
+
+---------------------------------
+Operational assumptions and limitations
+
+- `dados_ingresso_evasao_conclusao.csv` is descriptive/EDA; predictive modeling
+  centers on `dados_modelagem_temporal_sbie.csv`.
+- `concluintes_t` is valid only after the year-base t has been closed. For
+  decisions during the current year, it should be removed or replaced by a
+  partial variable available at decision time.
+- The model does not include socioeconomic or exogenous variables.
+- `ano_base=2020` may be lost after the completeness criterion; this is
+  diagnosed, not automatically imputed.
+- Binary classes can be imbalanced, so accuracy is auxiliary. Prefer F1,
+  precision, recall and confusion matrix.
+- The expected RF gain is moderate, not near-perfect, because the task is now
+  real temporal prediction rather than formula reconstruction.
+- Data are aggregated by course, not by individual student.
+
+See `docs/metodologia_modelagem_temporal.md` for the technical note intended for
+SBIE/RBIE review.

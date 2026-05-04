@@ -775,6 +775,24 @@ if "modelo_custom" not in st.session_state:
 # ===============================
 @st.cache_data(show_spinner=False)
 def load_reference_data() -> pd.DataFrame:
+    if not CAMINHO_DADOS.exists():
+        from evasao.processamento_dados.tratar_dados import (
+            gerar_dataset_modelagem_temporal_sbie,
+        )
+
+        st.warning(
+            "Base temporal SBIE não encontrada. Gerando a partir de "
+            "dados_cursos_serie_temporal.csv, sem executar coleta/download."
+        )
+        gerar_dataset_modelagem_temporal_sbie()
+
+    if not CAMINHO_DADOS.exists():
+        st.error(
+            "Não foi possível localizar dados_modelagem_temporal_sbie.csv. "
+            "Execute o tratamento de dados antes de abrir o dashboard."
+        )
+        st.stop()
+
     return pd.read_csv(CAMINHO_DADOS, sep=";", encoding="utf-8", low_memory=False)
 
 
@@ -940,7 +958,7 @@ indica que cerca de **metade dos estudantes** não conclui a graduação, o que 
 planejamento acadêmico, orçamento institucional e políticas públicas.
 
 Esse comportamento é **multivariado**: depende de vagas ofertadas, inscritos, ingressantes,
-matriculados, concluintes, modalidade (presencial/EaD), rede (pública/privada) e do ano de oferta.
+matriculados, concluintes observados no ano-base, modalidade (presencial/EaD), rede (pública/privada) e do ano de oferta.
 Intuição humana sozinha não é suficiente para entender todos esses padrões.
 
 ### O que é o App Evasão?
@@ -949,7 +967,7 @@ O **App Evasão** é uma aplicação web em **Streamlit** que:
 
 - estima a **taxa de evasão** (0 a 1) de cursos de graduação em IES brasileiras;
 - usa **microdados oficiais do INEP/MEC (2009–2024)** já tratados em um pipeline de dados;
-- permite simular cenários “*e se…*” alterando vagas, ingressantes, matriculados e concluintes;
+- permite simular cenários “*e se…*” alterando variáveis do ano-base t;
 - oferece uma interface simples para **gestores, pesquisadores e estudantes** explorarem os dados.
 
 A aplicação foi desenvolvida como projeto prático da disciplina **2COP507 – Reconhecimento de Padrões**, integrando
@@ -976,6 +994,10 @@ O backend do App é composto por um pipeline em Python dividido em múltiplos sc
   **taxa de evasão futura** (`taxa_evasao_alvo`) no ano seguinte. Para evitar
   *data leakage*, taxas de conclusão/evasão contemporâneas e colunas derivadas
   do alvo não são usadas como entrada.
+
+  Observação operacional: `concluintes_t` só é adequado em cenário após o
+  fechamento anual do ano-base. Para decisões durante o ano corrente, substitua
+  essa variável por indicador parcial disponível no momento da decisão.
 
 ### Como usar este painel?
 
@@ -1156,6 +1178,10 @@ with tab3:
             f"Avaliação temporal: treino ano_base <= {ANO_LIMITE_TREINO}; "
             f"teste ano_base > {ANO_LIMITE_TREINO}."
         )
+        st.warning(
+            "Acurácia é exibida apenas como métrica auxiliar. Em caso de classes "
+            "desbalanceadas, priorize F1, recall, precisão e matriz de confusão."
+        )
 
         col_p1, col_p2, col_p3 = st.columns(3)
         col_p1.metric("MAE (pipeline)", f"{mae_p:.4f}")
@@ -1166,9 +1192,9 @@ with tab3:
         y_bin_pred_p = (np.clip(y_pred_p, 0.0, 1.0) >= threshold_ui).astype(int)
 
         acc_p = accuracy_score(y_bin_true_p, y_bin_pred_p)
-        f1_p = f1_score(y_bin_true_p, y_bin_pred_p)
-        rec_p = recall_score(y_bin_true_p, y_bin_pred_p)
-        prec_p = precision_score(y_bin_true_p, y_bin_pred_p)
+        f1_p = f1_score(y_bin_true_p, y_bin_pred_p, zero_division=0)
+        rec_p = recall_score(y_bin_true_p, y_bin_pred_p, zero_division=0)
+        prec_p = precision_score(y_bin_true_p, y_bin_pred_p, zero_division=0)
 
         col_p4, col_p5, col_p6, col_p7 = st.columns(4)
         col_p4.metric("Acurácia (pipeline)", f"{acc_p:.4f}")
@@ -1177,7 +1203,7 @@ with tab3:
         col_p7.metric("Precisão (pipeline)", f"{prec_p:.4f}")
 
         st.markdown("#### Matriz de confusão — pipeline fixo")
-        cm_p = confusion_matrix(y_bin_true_p, y_bin_pred_p)
+        cm_p = confusion_matrix(y_bin_true_p, y_bin_pred_p, labels=[0, 1])
         fig_p, ax_p = plt.subplots(figsize=(5, 4))
         sns.heatmap(cm_p, annot=True, fmt="d", cmap="Blues", cbar=False, ax=ax_p)
         ax_p.set_xlabel("Predito")
@@ -1249,6 +1275,10 @@ with tab3:
 
         if clf:
             col_c3, col_c4, col_c5, col_c6 = st.columns(4)
+            st.warning(
+                "Acurácia é uma métrica auxiliar; interprete a classificação junto "
+                "com F1, recall, precisão e matriz de confusão."
+            )
             col_c3.metric(
                 "Acurácia (custom)", f"{clf.get('accuracy', float('nan')):.4f}"
             )

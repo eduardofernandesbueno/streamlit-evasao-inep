@@ -10,9 +10,14 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
+os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/matplotlib")
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns

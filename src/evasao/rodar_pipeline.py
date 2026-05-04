@@ -41,6 +41,7 @@ ETAPAS_PIPELINE = [
     # Produz análises exploratórias descritivas.
     "evasao.analises.analises",
     # Treina baselines, Regressão Linear e Random Forest no holdout temporal.
+    # Gera comparacao_baselines_temporal.*, diagnosticos e feature importance.
     "evasao.modelagem.randomforest",
     # Valida o baseline linear temporal e gráficos de erro.
     "evasao.analises.validar_modelos_temporais",
@@ -50,6 +51,11 @@ ETAPAS_PIPELINE = [
 
 
 if __name__ == "__main__":
+    print(
+        "Aviso: este orquestrador inclui etapas de coleta/download dos microdados. "
+        "Para auditoria local sem rede, execute diretamente os módulos de modelagem "
+        "e validação temporal."
+    )
     for etapa in ETAPAS_PIPELINE:
         run_module(etapa)
 

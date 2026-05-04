@@ -2,35 +2,35 @@ Resultados por subconjunto de variáveis (taxa_evasao)
 ======================================================================
 
 Subconjunto: oferta_demanda
-Features: ['numero_cursos', 'vagas_totais', 'inscritos_totais', 'ingressantes']
-Regressão Linear  -> MSE: 0.0872, R²: 0.0123
-Random Forest     -> MSE: 0.1020, R²: -0.1557
+Features: ['vagas_totais_t', 'inscritos_totais_t', 'ingressantes_t']
+Regressão Linear  -> MSE: 0.0807, R²: 0.0104
+Random Forest     -> MSE: 0.0956, R²: -0.1723
 Melhor modelo: Regressão Linear
-Classificação binária (threshold 0.50) -> Acurácia: 0.6900, Precisão: 0.6899, Recall: 0.9997, F1: 0.8164
+Classificação binária (threshold 0.50) -> Acurácia: 0.7175, Precisão: 0.7174, Recall: 0.9996, F1: 0.8353
 Matriz de confusão:
-[[   75 44518]
- [   29 99063]]
+[[  111 31426]
+ [   28 79763]]
 ----------------------------------------------------------------------
 
 Subconjunto: fluxo_academico
-Features: ['ingressantes', 'matriculados', 'concluintes']
-Regressão Linear  -> MSE: 0.0566, R²: 0.3593
-Random Forest     -> MSE: 0.0000, R²: 0.9999
+Features: ['ingressantes_t', 'matriculados_t', 'concluintes_t']
+Regressão Linear  -> MSE: 0.0684, R²: 0.1607
+Random Forest     -> MSE: 0.0582, R²: 0.2864
 Melhor modelo: Random Forest
-Classificação binária (threshold 0.50) -> Acurácia: 0.9997, Precisão: 1.0000, Recall: 0.9996, F1: 0.9998
+Classificação binária (threshold 0.50) -> Acurácia: 0.7292, Precisão: 0.8043, Recall: 0.8223, F1: 0.8132
 Matriz de confusão:
-[[44589     4]
- [   43 99049]]
+[[15573 15964]
+ [14182 65609]]
 ----------------------------------------------------------------------
 
 Subconjunto: geral_compacto
-Features: ['numero_cursos', 'vagas_totais', 'inscritos_totais', 'ingressantes', 'matriculados', 'concluintes']
-Regressão Linear  -> MSE: 0.0563, R²: 0.3625
-Random Forest     -> MSE: 0.0000, R²: 0.9999
+Features: ['ingressantes_t', 'concluintes_t', 'matriculados_t', 'vagas_totais_t', 'inscritos_totais_t']
+Regressão Linear  -> MSE: 0.0685, R²: 0.1595
+Random Forest     -> MSE: 0.0543, R²: 0.3337
 Melhor modelo: Random Forest
-Classificação binária (threshold 0.50) -> Acurácia: 0.9997, Precisão: 0.9999, Recall: 0.9996, F1: 0.9998
+Classificação binária (threshold 0.50) -> Acurácia: 0.7404, Precisão: 0.8095, Recall: 0.8342, F1: 0.8216
 Matriz de confusão:
-[[44588     5]
- [   39 99053]]
+[[15870 15667]
+ [13232 66559]]
 ----------------------------------------------------------------------
 

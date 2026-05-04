@@ -10,29 +10,34 @@
 # Finalmente, organiza as ~80 colunas em subconjuntos menores (domínios temáticos),
 # gerando arquivos derivados específicos por subconjunto para facilitar a análise e modelagem.
 
-import os
-import sys
-import pandas as pd
-import unicodedata
-import re
-import numpy as np
-from io import StringIO
+import csv
 import glob
+import os
+import re
+import sys
+import unicodedata
+from io import StringIO
+
+import numpy as np
+import pandas as pd
 
 # Garante que a pasta raiz do projeto (onde está `utils/`) esteja no sys.path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from scripts.utils.inspecao import registrar_ambiente, auditar_csv
+
+from evasao.utils.inspecao import auditar_csv, registrar_ambiente
+from evasao.utils.paths import DADOS_BRUTO, DADOS_PROCESSADO
 
 # ==========================================================================
 # CONFIGURAÇÕES GERAIS
 # ==========================================================================
 
+
 # Diretórios de entrada e saída (ajuste conforme sua estrutura)
-PASTA_BRUTO = os.path.join(BASE_DIR, "dados", "bruto")
-PASTA_PROCESSADO = os.path.join(BASE_DIR, "dados", "processado")
+PASTA_BRUTO = str(DADOS_BRUTO)
+PASTA_PROCESSADO = str(DADOS_PROCESSADO)
 
 registrar_ambiente(etapa="pre_processamento", contexto="início")
 
@@ -57,8 +62,8 @@ COLUNAS_IES_RELEVANTES = [
 MAPPING_IES = {
     "CO_IES": "id_ies",
     "NO_IES": "nome_ies",
-    "TP_REDE": "tipo_rede",     # 1 = pública, 2 = privada
-    "TP_CATEGORIA_ADMINISTRATIVA": "cat_adm",   # 1 = Fed, 2 = Est, etc.
+    "TP_REDE": "tipo_rede",  # 1 = pública, 2 = privada
+    "TP_CATEGORIA_ADMINISTRATIVA": "cat_adm",  # 1 = Fed, 2 = Est, etc.
     "QT_DOC_TOTAL": "docentes_total",
     "QT_DOC_EXE": "docentes_exercicio",
     "QT_DOC_EX_FEMI": "docentes_feminino",
@@ -87,7 +92,7 @@ MAPPING_CURSOS = {
     "CO_IES": "id_ies",
     "CO_CURSO": "id_curso",
     "NO_CURSO": "nome_curso",
-    "TP_MODALIDADE_ENSINO": "modalidade_ensino",    # 1=Presencial, 2=EAD
+    "TP_MODALIDADE_ENSINO": "modalidade_ensino",  # 1=Presencial, 2=EAD
     "QT_CURSO": "numero_cursos",
     "QT_VG_TOTAL": "vagas_totais",
     "QT_INSCRITO_TOTAL": "inscritos_totais",
@@ -178,6 +183,7 @@ SUBCONJUNTOS_CURSOS = {
 # FUNÇÕES DE APOIO
 # ==========================================================================
 
+
 def normalizar_conteudo_pipe(conteudo: str) -> str:
     """
     Remove repetições de delimitadores, espaços desnecessários e caracteres indesejados
@@ -198,7 +204,13 @@ def registrar_problemas(arquivo: str, erro: Exception) -> None:
         log.write(f"Arquivo: {arquivo}, Erro: {erro}\n")
 
 
-def carregar_csv(caminho_arquivo: str, sep: str = ";", encoding: str = "latin1", year: int | None = None) -> pd.DataFrame:
+def carregar_csv(
+    caminho_arquivo: str,
+    sep: str = ";",
+    encoding: str = "latin1",
+    year: int | None = None,
+    usecols: list[str] | None = None,
+) -> pd.DataFrame:
     """
     Carrega um arquivo CSV a partir de um caminho, tratando a normalização dos delimitadores.
 
@@ -209,42 +221,50 @@ def carregar_csv(caminho_arquivo: str, sep: str = ";", encoding: str = "latin1",
     """
     try:
         print(f"Lendo arquivo: {caminho_arquivo}")
-        with open(caminho_arquivo, encoding=encoding) as f:
-            conteudo = f.read()
 
-        if year is not None and year <= 2008 and "|" in conteudo:
-            print(f"⚠️ Detecção de separadores múltiplos para ano {year}. Normalizando...")
-            conteudo = normalizar_conteudo_pipe(conteudo)
-            df = pd.read_csv(
-                StringIO(conteudo),
-                sep="|",
-                header=0,
-                engine="python",
-                on_bad_lines="skip",
-            )
-            if df.shape[1] == 1:
-                # Se restar somente uma coluna, tenta separar manualmente essa coluna usando o delimitador "|"
-                print("⚠️ Apenas uma coluna detectada após normalização. Tentando separar manualmente...")
-                df = df.iloc[:, 0].str.split("|", expand=True)
-                # Assume-se que a primeira linha são os cabeçalhos
-                df.columns = df.iloc[0]
-                df = df[1:]
-            return df
-        else:
-            return pd.read_csv(
-                StringIO(conteudo),
-                sep=sep,
-                header=0,
-                engine="python",
-                on_bad_lines="skip",
-            )
+        if year is not None and year <= 2008:
+            with open(caminho_arquivo, encoding=encoding) as f:
+                conteudo = f.read()
+
+            if "|" in conteudo:
+                print(
+                    f"⚠️ Detecção de separadores múltiplos para ano {year}. Normalizando..."
+                )
+                conteudo = normalizar_conteudo_pipe(conteudo)
+                df = pd.read_csv(
+                    StringIO(conteudo),
+                    sep="|",
+                    header=0,
+                    engine="python",
+                    on_bad_lines="skip",
+                )
+                if df.shape[1] == 1:
+                    print(
+                        "⚠️ Apenas uma coluna detectada após normalização. Tentando separar manualmente..."
+                    )
+                    df = df.iloc[:, 0].str.split("|", expand=True)
+                    df.columns = df.iloc[0]
+                    df = df[1:]
+                return df
+
+        return pd.read_csv(
+            caminho_arquivo,
+            sep=sep,
+            encoding=encoding,
+            header=0,
+            usecols=usecols,
+            low_memory=False,
+            on_bad_lines="skip",
+        )
     except Exception as e:
         print(f"Erro ao carregar {caminho_arquivo}: {e}")
         registrar_problemas(caminho_arquivo, e)
         return pd.DataFrame()
 
 
-def filtrar_renomear(df: pd.DataFrame, colunas_relevantes: list[str], mapping: dict) -> pd.DataFrame:
+def filtrar_renomear(
+    df: pd.DataFrame, colunas_relevantes: list[str], mapping: dict
+) -> pd.DataFrame:
     """
     Seleciona apenas as colunas relevantes contidas no DataFrame e as renomeia conforme
     o dicionário de mapeamento fornecido.
@@ -262,7 +282,11 @@ def corrigir_nome_pasta(caminho_base: str, ano: int) -> str | None:
     caminho_esperado = os.path.join(caminho_base, f"INEP_{ano}-MICRODADOS-CENSO")
     if os.path.exists(caminho_esperado):
         for pasta in os.listdir(caminho_esperado):
-            pasta_corrigida = unicodedata.normalize("NFKD", pasta).encode("ASCII", "ignore").decode("ASCII")
+            pasta_corrigida = (
+                unicodedata.normalize("NFKD", pasta)
+                .encode("ASCII", "ignore")
+                .decode("ASCII")
+            )
             pasta_corrigida = re.sub(r"[^a-zA-Z0-9_\- ]", "", pasta_corrigida)
             if "microdados" in pasta_corrigida.lower():
                 return os.path.join(caminho_esperado, pasta)
@@ -277,7 +301,9 @@ def corrigir_nome_arquivo(nome_arquivo: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_\-\. ]", "", nome_arquivo)
 
 
-def salvar_subconjuntos(df: pd.DataFrame, ano: int, base: str, subconjuntos: dict[str, list[str]]) -> None:
+def salvar_subconjuntos(
+    df: pd.DataFrame, ano: int, base: str, subconjuntos: dict[str, list[str]]
+) -> None:
     """
     Gera e salva arquivos derivados contendo apenas as colunas de cada subconjunto temático.
 
@@ -288,23 +314,42 @@ def salvar_subconjuntos(df: pd.DataFrame, ano: int, base: str, subconjuntos: dic
     base : 'ies' ou 'cursos'
     subconjuntos : dicionário {nome_subconjunto: [lista_de_colunas_renomeadas]}
     """
+    chunk_size = 50000
+
     for nome_sub, cols in subconjuntos.items():
-        # Mantém apenas colunas que realmente existem no DataFrame
         cols_existentes = [c for c in cols if c in df.columns]
         if not cols_existentes:
-            # Nada para salvar neste subconjunto para este ano
             continue
 
-        df_sub = df[cols_existentes].copy()
-        nome_arquivo = os.path.join(PASTA_PROCESSADO, f"dados_{base}_{ano}_{nome_sub}.csv")
+        nome_arquivo = os.path.join(
+            PASTA_PROCESSADO, f"dados_{base}_{ano}_{nome_sub}.csv"
+        )
         os.makedirs(os.path.dirname(nome_arquivo), exist_ok=True)
-        df_sub.to_csv(nome_arquivo, sep=";", index=False, encoding="utf-8")
+
+        total_linhas = len(df)
+        primeira_escrita = True
+
+        for inicio in range(0, total_linhas, chunk_size):
+            fim = min(inicio + chunk_size, total_linhas)
+            df_chunk = df.iloc[inicio:fim][cols_existentes]
+            df_chunk.to_csv(
+                nome_arquivo,
+                sep=";",
+                index=False,
+                encoding="utf-8",
+                mode="w" if primeira_escrita else "a",
+                header=primeira_escrita,
+                quoting=csv.QUOTE_MINIMAL,
+            )
+            primeira_escrita = False
+
         print(f"[OK] subconjunto '{nome_sub}' ({base}) gerado em: {nome_arquivo}")
 
 
 # ==========================================================================
 # PROCESSAMENTO PRINCIPAL
 # ==========================================================================
+
 
 def main(year: int = 2024) -> None:
     arquivos_disponiveis: list[str] = []
@@ -330,27 +375,36 @@ def main(year: int = 2024) -> None:
             elif "GRADUACAO_PRESENCIAL" in arq.upper():
                 os.rename(
                     os.path.join(caminho_dados, arq),
-                    os.path.join(caminho_dados, f"MICRODADOS_CADASTRO_CURSOS_{year}.CSV"),
+                    os.path.join(
+                        caminho_dados, f"MICRODADOS_CADASTRO_CURSOS_{year}.CSV"
+                    ),
                 )
         arquivos_disponiveis = os.listdir(caminho_dados)
 
-    ARQUIVO_IES = f"MICRODADOS_ED_SUP_IES_{year}.CSV"
+    arquivo_ies_esperado_moderno = f"MICRODADOS_ED_SUP_IES_{year}.CSV"
+    arquivo_ies_esperado_antigo = f"MICRODADOS_CADASTRO_IES_{year}.CSV"
     ARQUIVO_CURSOS = f"MICRODADOS_CADASTRO_CURSOS_{year}.CSV"
 
     caminho_ies = None
     for arquivo in arquivos_disponiveis:
         nome_normalizado = corrigir_nome_arquivo(arquivo).upper()
-        if nome_normalizado.startswith(f"MICRODADOS_ED_SUP_IES_{year}") and nome_normalizado.endswith(".CSV"):
+        if nome_normalizado in {
+            f"MICRODADOS_ED_SUP_IES_{year}.CSV",
+            f"MICRODADOS_CADASTRO_IES_{year}.CSV",
+        }:
             caminho_ies = os.path.join(caminho_dados, arquivo)
             break
 
-    # Fallback para nome padrão, se não encontrar com sufixo
     if caminho_ies is None:
-        caminho_ies = os.path.join(caminho_dados, f"MICRODADOS_ED_SUP_IES_{year}.CSV")
+        caminho_ies = os.path.join(caminho_dados, arquivo_ies_esperado_moderno)
 
     print(f"Arquivos encontrados em {caminho_dados}: {arquivos_disponiveis}")
-    print(f"Arquivo IES esperado: {ARQUIVO_IES}")
-    print(f"Arquivo IES identificado: {caminho_ies if os.path.exists(caminho_ies) else 'NÃO ENCONTRADO'}")
+    print(
+        f"Arquivo IES esperado: {arquivo_ies_esperado_moderno} OU {arquivo_ies_esperado_antigo}"
+    )
+    print(
+        f"Arquivo IES identificado: {caminho_ies if os.path.exists(caminho_ies) else 'NÃO ENCONTRADO'}"
+    )
 
     df_ies_final = pd.DataFrame()
     df_cursos_final = pd.DataFrame()
@@ -359,24 +413,32 @@ def main(year: int = 2024) -> None:
     # Carregar e processar MICRODADOS_ED_SUP_IES_{year}.CSV
     # ----------------------------------------------------------------------
     if os.path.isfile(caminho_ies):
-        df_ies = carregar_csv(caminho_ies, year=year)
+        df_ies = carregar_csv(
+            caminho_ies, year=year, usecols=lambda c: c in COLUNAS_IES_RELEVANTES
+        )
         if not df_ies.empty:
             df_ies_final = filtrar_renomear(df_ies, COLUNAS_IES_RELEVANTES, MAPPING_IES)
             # adiciona coluna de ano para possibilitar split temporal posterior
             df_ies_final["ano"] = year
         else:
-            print(f"Aviso: {ARQUIVO_IES} está vazio ou não pôde ser processado.")
+            print(
+                f"Aviso: {arquivo_ies_esperado_moderno} OU {arquivo_ies_esperado_antigo} está vazio ou não pôde ser processado."
+            )
     else:
-        print(f"Aviso: Arquivo {ARQUIVO_IES} não encontrado em {caminho_ies}.")
+        print("Aviso: Arquivo de IES não encontrado (nem formato moderno nem antigo).")
 
     # ----------------------------------------------------------------------
     # Carregar e processar MICRODADOS_CADASTRO_CURSOS_{year}.CSV
     # ----------------------------------------------------------------------
     caminho_cursos = os.path.join(caminho_dados, corrigir_nome_arquivo(ARQUIVO_CURSOS))
     if os.path.isfile(caminho_cursos):
-        df_cursos = carregar_csv(caminho_cursos, year=year)
+        df_cursos = carregar_csv(
+            caminho_cursos, year=year, usecols=lambda c: c in COLUNAS_CURSOS_RELEVANTES
+        )
         if not df_cursos.empty:
-            df_cursos_final = filtrar_renomear(df_cursos, COLUNAS_CURSOS_RELEVANTES, MAPPING_CURSOS)
+            df_cursos_final = filtrar_renomear(
+                df_cursos, COLUNAS_CURSOS_RELEVANTES, MAPPING_CURSOS
+            )
             # adiciona coluna de ano para possibilitar split temporal posterior
             df_cursos_final["ano"] = year
         else:
@@ -405,7 +467,9 @@ def main(year: int = 2024) -> None:
         df_cursos_final.to_csv(saida_cursos, sep=";", index=False, encoding="utf-8")
         print(f"[OK] dados_cursos gerado em: {saida_cursos}")
         # auditoria rápida da saída consolidada
-        auditar_csv(saida_cursos, etapa="pre_processado", contexto=f"cursos_{year}", n=5)
+        auditar_csv(
+            saida_cursos, etapa="pre_processado", contexto=f"cursos_{year}", n=5
+        )
         # geração dos subconjuntos temáticos da base de Cursos
         salvar_subconjuntos(df_cursos_final, year, "cursos", SUBCONJUNTOS_CURSOS)
     else:
@@ -414,6 +478,13 @@ def main(year: int = 2024) -> None:
 
 if __name__ == "__main__":
     # Exemplo: processar todos os anos de 2009 a 2024 (ajuste conforme os microdados disponíveis)
-    for year in range(2009, 2025):
-        print(f"\n=== Processando ano {year} ===")
-        main(year)
+    anos = list(range(2009, 2025))
+    for i, ano in enumerate(anos, start=1):
+        total_anos = len(anos)
+        percentual = (i / total_anos) * 100
+
+        print("\n" + "=" * 80)
+        print(f"PROCESSANDO ANO {ano} ({i}/{total_anos})")
+        print(f"PROGRESSO DO PRÉ-PROCESSAMENTO: {percentual:.1f}%")
+        print("=" * 80)
+        main(ano)

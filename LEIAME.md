@@ -4,7 +4,7 @@ Este repositório apresenta uma aplicação completa para predição da evasão 
 
 Objetivo
 
-Desenvolver uma aplicação prática que incorpore pelo menos um algoritmo de aprendizado de máquina estudado na disciplina (regressão, classificação ou ensembles).  O foco é aplicar técnicas de ciência de dados para estimar a taxa de evasão em cursos presenciais a partir dos microdados do INEP/MEC e disponibilizar os resultados por meio de uma interface amigável.  Nesta implementação utiliza‑se como modelo base a Random Forest, mas o pipeline permite testar outros algoritmos (Regressão Linear, Feature_Based e Fine-Tuning) conforme os requisitos.
+Desenvolver uma aplicação prática que incorpore pelo menos um algoritmo de aprendizado de máquina estudado na disciplina (regressão, classificação ou ensembles).  O foco é aplicar técnicas de ciência de dados para estimar a taxa de evasão em cursos presenciais a partir dos microdados do INEP/MEC e disponibilizar os resultados por meio de uma interface amigável.  Nesta implementação utiliza-se Random Forest como modelo principal e baselines temporais explícitos, incluindo média histórica, persistência e Regressão Linear.
 
 Estrutura de pastas/arquivos principal
 ├── dados/                     # Conjunto de dados utilizados no projeto
@@ -13,12 +13,12 @@ Estrutura de pastas/arquivos principal
 │   └── intermediario/         # Dados temporários
 ├── modelos/                   # Modelos treinados e métricas salvas
 ├── notebooks/                 # Notebooks Jupyter (opcional)
-├── scripts/                   # Scripts Python para todo o pipeline
+├── src/evasao/                # Pacote Python principal do pipeline
 │   ├── analises/              # Análises exploratórias e validações
 │   ├── auditoria/             # Inspeções, logging, validação estrutural
 │   ├── coleta_dados/          # Coleta e download dos microdados do INEP
-│   ├── dashboard/app_evasao.py# Aplicação Streamlit (app_evasao.py)
-│   ├── modelagem/             # Treinamento, RF, Feature_based e avaliação de modelos
+│   ├── dashboard/app_evasao.py# Aplicação Streamlit
+│   ├── modelagem/             # Baselines temporais, RF e avaliação de modelos
 │   ├── processamento_dados/   # Pré-processamento e tratamento dos dados
 │   ├── relatorio/             # Geração de relatórios, PDF, apêndices
 │   ├── utils/                 # Funções auxiliares (inspeção, helpers)
@@ -34,8 +34,8 @@ Dependências
 	•	tensorflow/keras (opcional) para redes neurais
 	•	Consulte o arquivo requirements.txt para a lista completa.  Instale as dependências com:
 
-    python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv
+source /Users/eddieferb/streamlit-evasao-inep/.venv/bin/activate
 pip install -r requirements.txt
 
 Pipeline do Projeto
@@ -43,32 +43,28 @@ Pipeline do Projeto
 ## Pipeline de execução
 
 1. Coletar links oficiais do INEP  
-   `python scripts/coleta_dados/coletar_links_inep.py`
+   `python src/evasao/coleta_dados/coletar_links_inep.py`
 
 2. Baixar e organizar os microdados  
-   `python scripts/coleta_dados/coleta_dados_oficiais.py`
+   `python src/evasao/coleta_dados/coleta_dados_oficiais.py`
 
 3. Pré-processar e padronizar variáveis  
-   `python scripts/processamento_dados/pre_processamento.py`
+   `python src/evasao/processamento_dados/pre_processamento.py`
 
 4. Tratar dados e gerar bases finais  
-   `python scripts/processamento_dados/tratar_dados.py`
+   `python src/evasao/processamento_dados/tratar_dados.py`
 
 5. Análises exploratórias  
-   `python scripts/analises/analises.py`
+   `python src/evasao/analises/analises.py`
 
-6. Treinar modelos de previsão Random Forest (Modelo principal)  
-   `python scripts/modelagem/randomforest.py`
-   6.2 Treinar modelos de previsão Fine_Tuning (Modelo opcional)
-   `python scripts/modelagem/fine_tuning.py`
-   6.3 Treinar modelos de previsão Feature_Based (Modelo opcional)
-   `python scripts/modelagem/feature_based.py`
+6. Comparar baselines temporais e treinar Random Forest  
+   `python src/evasao/modelagem/randomforest.py`
 
 7. Gerar gráficos para o relatório  
-   `python scripts/visualizacao/gerar_graficos.py`
+   `python src/evasao/visualizacao/gerar_graficos.py`
 
 8. Subir dashboard Streamlit  
-   `streamlit run scripts/dashboard/app_evasao.py`
+   `/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py`
 
 ⸻
 
@@ -76,14 +72,14 @@ Executar o pipeline completo (Script Orquestrador)
 
 Execute todo o pipeline de ponta a ponta (coleta de dados, pré-processamento, modelagem e visualização) usando o script orquestrador. Certifique-se de que o ambiente virtual esteja ativado e que as dependências do arquivo requirements.txt estejam instaladas antes de executar.
 
-Ative o ambiente virtual:
-   `source .venv/bin/activate`
+Ative o ambiente virtual a partir de qualquer pasta:
+   `source /Users/eddieferb/streamlit-evasao-inep/.venv/bin/activate`
 
 Rode o orchestrator:
-   `python scripts/rodar_pipeline.py`
+   `/Users/eddieferb/streamlit-evasao-inep/.venv/bin/python /Users/eddieferb/streamlit-evasao-inep/src/evasao/rodar_pipeline.py`
 
 Finalmente, rode manualmente o Streamlit dashboard 
-   `streamlit run scripts/dashboard/app_evasao.py`
+   `/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py`
 
 ⸻
 
@@ -91,45 +87,41 @@ Finalmente, rode manualmente o Streamlit dashboard
 
 1. Coleta dos Microdados
 
-Os microdados oficiais do INEP (2009–2024) são baixados diretamente das fontes públicas por meio do script scripts/coleta_dados/coleta_dados_oficiais.py.  Este script cria a estrutura de pastas em dados/bruto/ e armazena os arquivos CSV correspondentes aos censos anuais.  A etapa de coleta deve ser executada uma única vez:
+Os microdados oficiais do INEP (2009–2024) são baixados diretamente das fontes públicas por meio do script src/evasao/coleta_dados/coleta_dados_oficiais.py.  Este script cria a estrutura de pastas em dados/bruto/ e armazena os arquivos CSV correspondentes aos censos anuais.  A etapa de coleta deve ser executada uma única vez:
 
-python scripts/coleta_dados/coletar_links_inep.py
-python scripts/coleta_dados/coleta_dados_oficiais.py
+python src/evasao/coleta_dados/coletar_links_inep.py
+python src/evasao/coleta_dados/coleta_dados_oficiais.py
 
 2. Pré‑processamento e Análise Exploratória
 
-O pré‑processamento consiste em limpar e padronizar os dados, selecionar apenas os cursos presenciais e consolidar as variáveis de interesse.  Execute o script scripts/processamento/pre_processamento.py para unificar os anos e gerar os arquivos tratados em dados/processado/:
+O pré‑processamento consiste em limpar e padronizar os dados, selecionar apenas os cursos presenciais e consolidar as variáveis de interesse.  Execute o script src/evasao/processamento_dados/pre_processamento.py para unificar os anos e gerar os arquivos tratados em dados/processado/:
 
-python scripts/processamento/pre_processamento.py
+python src/evasao/processamento_dados/pre_processamento.py
 
 
 Esta etapa inclui:
-	•	Seleção das colunas relevantes (ex.: taxa_ingresso, taxa_conclusao, taxa_evasao, vagas_totais).
+	•	Seleção das colunas relevantes para análise descritiva e modelagem temporal (ex.: vagas_totais, inscritos_totais, ingressantes, matriculados, concluintes).
 	•	Correção de valores ausentes e conversão de tipos.
 	•	Geração de conjuntos dados_cursos_tratado.csv e dados_ies_tratado.csv para modelagem.
 	•	Análise exploratória básica (histogramas, mapas de calor), opcionalmente em Jupyter notebooks.
 
 3. Divisão de Dados e Engenharia de Atributos
 
-Os scripts da pasta scripts/processamento permitem preparar diferentes conjuntos de entrada.  Por exemplo, para Transfer Learning ou para combinações de features adicionais (media_geral, taxa_ingresso, taxa_conclusao).  Ajuste conforme a necessidade.  Para o projeto Streamlit, recomenda‑se começar com as variáveis taxa_ingresso e taxa_conclusao como preditoras da taxa_evasao.
+Os scripts da pasta src/evasao/processamento_dados permitem preparar conjuntos temporais de entrada. Para o projeto Streamlit, a base atual usa atributos observados no ano t (`ingressantes_t`, `concluintes_t`, `matriculados_t`, `vagas_totais_t`, `inscritos_totais_t`) para estimar o alvo futuro `taxa_evasao_alvo` no ano t+1. As taxas contemporâneas `taxa_conclusao` e `taxa_evasao` são variáveis descritivas e não devem entrar como preditoras da evasão no mesmo ano, pois isso apenas reconstruiria uma fórmula direta.
 
 4. Modelagem
 
-Treine os modelos de machine learning disponíveis executando os scripts de modelagem:
-	•	Modelo original (Random Forest + Regressão Linear) – scripts/modelagem/randomforest.py
-	•	Modelo com engenharia de features (Random Forest) – scripts/modelagem/feature_based.py.py
-	•	Modelo com fine‑tuning de rede neural (ANN) – scripts/modelagem/treinamento_modelo_Fine-tuning.py (opcional)
-	•	Modelo com árvore C4.5/J48 – scripts/modelagem/treinamento_modelo_C4.5_Tree_J48.py (avaliado como alternativa)
+Treine os modelos de machine learning disponíveis executando src/evasao/modelagem/randomforest.py.
 
-Os scripts dividem o conjunto de dados em treino e teste, treinam os modelos e registram métricas (MSE, R²) em modelos/resultados_modelos/.  Por padrão, o script modelagem/randomforest.py compara Regressão Linear com Random Forest e salva o melhor modelo.  Você pode ajustar os hiperparâmetros diretamente nos scripts ou pelo painel Streamlit.
+O pipeline atual adota validação temporal: as features em t predizem `taxa_evasao_alvo` em t+1, com treino em `ano_base <= 2018` e teste em `ano_base > 2018`. Variáveis futuras ou diretamente derivadas do alvo, como `taxa_conclusao_alvo`, são proibidas como features. O script compara média histórica, persistência (`taxa_evasao_t`), Regressão Linear e Random Forest no mesmo holdout temporal, salvando a tabela de métricas e o ranking de feature importance da RF em modelos/resultados_modelos/.
 
 5. Avaliação e Visualização
 
-Use scripts/visualizacao/gerar_graficos.py para gerar curvas de evolução das taxas de ingresso, conclusão e evasão, além de matrizes de confusão e comparativos entre modelos.  As métricas são salvas como PNG em modelos/resultados_modelos/.  Para validação temporal e comparações por curso, execute scripts/analises/validar_modelos_temporais.py e scripts/analises/comparar_predicoes_cursos.py.
+Use src/evasao/visualizacao/gerar_graficos.py para gerar curvas de evolução das taxas de ingresso, conclusão e evasão, além de matrizes de confusão e comparativos entre modelos.  As métricas são salvas como PNG em modelos/resultados_modelos/.  Para validação temporal e comparações por curso, execute src/evasao/analises/validar_modelos_temporais.py e src/evasao/analises/comparar_predicoes_cursos.py.
 
 6. Interface Streamlit
 
-A aplicação interativa é implementada em app/app_evasao.py.  Este painel carrega o modelo treinado e permite:
+A aplicação interativa é implementada em src/evasao/dashboard/app_evasao.py.  Este painel carrega o modelo treinado e permite:
 	•	Selecionar o curso (Administração, Direito, Engenharia Civil, Medicina) para análise.
 	•	Ajustar hiperparâmetros do modelo Random Forest através de sliders e caixas de seleção (por exemplo, número de árvores n_estimators, profundidade máxima max_depth e critério de divisão).  Estes controles são definidos com st.slider e st.selectbox.
 	•	Exibir métricas em tempo real (MSE, R²) e uma matriz de confusão para avaliação da classificação binária (evasão alta vs. baixa).
@@ -137,13 +129,13 @@ A aplicação interativa é implementada em app/app_evasao.py.  Este painel carr
 
 Para executar o painel:
 
-streamlit run app/app_evasao.py
+/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py
 
 7. Vídeo e Relatório
 
 Para a entrega final, grave um vídeo de até 15 minutos explicando: (1) a motivação do projeto, (2) como o pipeline foi construído, (3) o funcionamento do modelo e (4) a interface Streamlit.  Além disso, crie um artigo curto (até 4 páginas) no template da SBC descrevendo a escolha dos algoritmos, os hiperparâmetros testados (justificando os valores escolhidos) e discutindo os resultados e melhorias futuras.
 
-Obs.: Além do pipeline principal, explorei abordagens paralelas (fine-tuning e feature-based) apenas como experimentação adicional, não incluídas no projeto final. 
+Obs.: O pipeline documentado para publicação prioriza a comparação temporal auditável entre baselines simples e Random Forest, evitando formulações em que o modelo apenas reconstrói a taxa de evasão a partir de variáveis contemporâneas diretamente relacionadas ao alvo.
 
 Sobre o Reuso dos Modelos
 
@@ -151,7 +143,7 @@ Os modelos Random Forest já treinados nos scripts originais podem servir de ba
 	1.	Hiperparâmetros: os scripts fixam valores como n_estimators=100 e max_depth=None.  Para atender aos requisitos de interação, exponha esses parâmetros no painel para que o usuário possa ajustá‑los e observar o impacto nas métricas.
 	2.	Atualização de dados: o MVP descrito no Projeto Prático de Aprendizado de Máquina com Streamlit utilizou inicialmente dados de 2023 e, posteriormente, dados de 2009 a 2024.  Caso você utilize um recorte diferente ou incorpore novas features, é necessário re‑treinar o modelo para refletir essas alterações.  O pipeline automatizado permite refazer o treinamento sempre que novos dados forem incluídos.
 
-Portanto, reutilize a estrutura dos scripts de modelagem (funções de treinamento e salvamento), mas permita ajustes de hiperparâmetros no código ou pela interface.  Isso garantirá que a aplicação atenda aos critérios de avaliação (interface, implementação do modelo e documentação) estabelecidos pelos professores.
+Portanto, reutilize a estrutura em src/evasao/modelagem/randomforest.py para treinamento, salvamento de métricas, comparação com baselines e interpretação por feature importance.  Isso garantirá que a aplicação atenda aos critérios de avaliação (interface, implementação do modelo e documentação) estabelecidos pelos professores.
 
 Contribuição e Licença
 
@@ -174,3 +166,18 @@ Contribuições
 Licença
 - Consulte o arquivo LICENCA para os termos de uso e distribuição.
 
+Nota metodológica
+
+A base de modelagem do Streamlit é temporal: usa atributos observados no ano t
+para estimar `taxa_evasao_alvo` no ano t+1. A validação usa treino com
+`ano_base <= 2018` e teste com `ano_base > 2018`.
+
+A coluna inversa do alvo `taxa_conclusao_alvo` não é persistida em
+`dados/processado/dados_modelagem_temporal_sbie.csv` e não deve entrar como
+feature. Os testes em `tests/` protegem esse contrato anti-leakage.
+
+A etapa de modelagem salva os artefatos de auditoria em `modelos/resultados_modelos/`:
+- `comparacao_baselines_temporal.csv` e `.md`: média histórica, persistência,
+  Regressão Linear e Random Forest no mesmo holdout temporal;
+- `feature_importance_random_forest.csv` e `.md`: ranking de importância do RF;
+- `metodologia_temporal_antileakage.md`: nota curta para revisão metodológica.

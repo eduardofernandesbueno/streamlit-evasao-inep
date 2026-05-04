@@ -2,9 +2,10 @@ streamlit
 pandas
 numpy
 scikit-learn
-jobli
+joblib
 plotly
 requests
 beautifulsoup4
 python-docx
 python-documents
+pytest

@@ -2,36 +2,77 @@
 # Objetivo: Analisar dados de cursos e calcular/visualizar as taxas de conclusão e evasão por curso e ano
 
 import os
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 import re
-from glob import glob
 
 # ==== EDA/Audit Imports e Auditoria Inicial ====
 import sys
+from glob import glob
 from pathlib import Path
 
-# Garante que a raiz do projeto esteja no sys.path para permitir imports do pacote scripts
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
-from scripts.utils.inspecao import registrar_ambiente, auditar_df
+BASE_DIR = Path(__file__).resolve().parents[3]
+SRC_DIR = BASE_DIR / "src"
+
+# Garante que a raiz do projeto e a pasta src estejam no sys.path
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+from evasao.utils.inspecao import auditar_df, registrar_ambiente
+from evasao.utils.paths import DADOS_PROCESSADO
 
 # Diretório padrão onde os CSVs processados são gravados
-PASTA_PROCESSADO = "./dados/processado"
+PASTA_PROCESSADO = str(DADOS_PROCESSADO)
 
 registrar_ambiente(etapa="analises", contexto="antes_eda")
 
-# Carrega o consolidado para EDA geral (saída de tratar_dados.py)
+# ---------------------------------------------------------------------
+# Base descritiva / EDA geral
+# ---------------------------------------------------------------------
+# Esta base continua útil para:
+# - EDA
+# - estatísticas descritivas
+# - gráficos exploratórios
+# - tabelas de apoio
+# Mas não é a base principal de treino do RF do artigo SBIE.
 df_eda = pd.read_csv(
-    os.path.join(PASTA_PROCESSADO, "dados_ingresso_evasao_conclusao.csv"), sep=";"
+    os.path.join(PASTA_PROCESSADO, "dados_ingresso_evasao_conclusao.csv"),
+    sep=";",
+    encoding="utf-8",
+    low_memory=False,
 )
 
 # Auditoria antes de qualquer transformação mais pesada
 auditar_df(df_eda, etapa="analises", contexto="df_bruto_para_eda", n=5)
+
+# ---------------------------------------------------------------------
+# Base temporal SBIE
+# ---------------------------------------------------------------------
+# Base principal metodológica do artigo para modelagem preditiva temporal.
+caminho_temporal_sbie = os.path.join(
+    PASTA_PROCESSADO, "dados_modelagem_temporal_sbie.csv"
+)
+if os.path.exists(caminho_temporal_sbie):
+    df_temporal_sbie = pd.read_csv(
+        caminho_temporal_sbie,
+        sep=";",
+        encoding="utf-8",
+        low_memory=False,
+    )
+    auditar_df(
+        df_temporal_sbie,
+        etapa="analises",
+        contexto="df_temporal_sbie_para_eda",
+        n=5,
+    )
+else:
+    print(f"Arquivo temporal SBIE não encontrado: {caminho_temporal_sbie}")
+    df_temporal_sbie = pd.DataFrame()
 
 # Define o mapeamento de cores: verde para "Taxa de Conclusão" e vermelho para "Taxa de Evasão"
 color_map = {"Taxa de Conclusão": "green", "Taxa de Evasão": "red"}
@@ -56,7 +97,7 @@ for ano in anos:
     caminho = os.path.join(PASTA_PROCESSADO, f"dados_cursos_tratado_{ano}.csv")
     if os.path.exists(caminho):
         # Lê tudo inicialmente como string para depois converter colunas numéricas
-        df = pd.read_csv(caminho, sep=";", dtype=str)
+        df = pd.read_csv(caminho, sep=";", dtype=str, encoding="utf-8")
         for col in numeric_cols:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -75,43 +116,99 @@ dados_cursos_tratado = pd.concat(lista_cursos, ignore_index=True)
 df_treino = dados_cursos_tratado[dados_cursos_tratado["ano"] <= ANO_CORTE]
 df_teste = dados_cursos_tratado[dados_cursos_tratado["ano"] > ANO_CORTE]
 
+print("\n" + "=" * 70)
+print("ANÁLISES DESCRITIVAS INICIADAS")
+print("=" * 70)
+print("Base descritiva carregada: dados_ingresso_evasao_conclusao.csv")
+print(f"Linhas base EDA: {len(df_eda):,}".replace(",", "."))
+print(f"Colunas base EDA: {len(df_eda.columns)}")
+
+if not df_temporal_sbie.empty:
+    print("Base temporal SBIE carregada: dados_modelagem_temporal_sbie.csv")
+    print(f"Linhas base temporal: {len(df_temporal_sbie):,}".replace(",", "."))
+    print(f"Colunas base temporal: {len(df_temporal_sbie.columns)}")
+else:
+    print("Base temporal SBIE não encontrada para apoio analítico.")
+
+print(f"Arquivos anuais de cursos carregados: {len(lista_cursos)}")
+print(
+    "Checagem de consistência temporal (cursos tratados):",
+    len(df_treino),
+    len(df_teste),
+    len(dados_cursos_tratado),
+)
+print(
+    f"Janela temporal descritiva - treino até {ANO_CORTE}: {len(df_treino):,} linhas".replace(
+        ",", "."
+    )
+)
+print(
+    f"Janela temporal descritiva - teste após {ANO_CORTE}: {len(df_teste):,} linhas".replace(
+        ",", "."
+    )
+)
+print(
+    f"Janela temporal descritiva - total cursos tratados: {len(dados_cursos_tratado):,} linhas".replace(
+        ",", "."
+    )
+)
+
+print("\n[INFO] Este script é de apoio descritivo.")
+print(
+    "[INFO] O centro metodológico do SBIE permanece no randomforest.py com base temporal sem leakage."
+)
+print(
+    "[INFO] As curvas por curso com duração curricular assumida são apenas visualizações descritivas."
+)
+print("[INFO] Não use essas curvas como evidência principal de performance preditiva.")
+print("=" * 70 + "\n")
+
 # =============================================================================
-# Leitura dos dados de universidades (IES) – utilizando a base do ano 2023
+# Leitura dos dados de universidades (IES) – utilizando a base correspondente
+# a cada ano, para manter a parte descritiva historicamente mais rigorosa
 # =============================================================================
-ies_path = os.path.join(PASTA_PROCESSADO, "dados_ies_tratado_2023.csv")
-if not os.path.exists(ies_path):
+lista_ies: list[pd.DataFrame] = []
+
+for ano in anos:
+    ies_path = os.path.join(PASTA_PROCESSADO, f"dados_ies_tratado_{ano}.csv")
+    if os.path.exists(ies_path):
+        df_ies_ano = pd.read_csv(ies_path, sep=";", dtype=str, encoding="utf-8")
+        df_ies_ano["ano"] = ano
+        lista_ies.append(df_ies_ano)
+    else:
+        print(f"Arquivo de IES não encontrado: {ies_path}")
+
+if not lista_ies:
     raise FileNotFoundError(
-        f"Arquivo de IES não encontrado em: {ies_path}. Verifique o pré-processamento."
+        "Nenhum arquivo 'dados_ies_tratado_*.csv' foi encontrado para os anos especificados."
     )
 
-dados_ies_tratado = pd.read_csv(ies_path, sep=";", dtype=str)
+dados_ies_tratado = pd.concat(lista_ies, ignore_index=True)
 
 # =============================================================================
 # Unindo os dados de cursos (apenas período de treino) e universidades
 # =============================================================================
-
-all_data = pd.merge(df_treino, dados_ies_tratado, on="id_ies", how="left")
-if "ano_x" in all_data.columns and "ano_y" in all_data.columns:
-    all_data["ano"] = all_data["ano_x"]
-    all_data = all_data.drop(columns=["ano_x", "ano_y"])
-elif "ano_x" in all_data.columns:
-    all_data = all_data.rename(columns={"ano_x": "ano"})
-elif "ano_y" in all_data.columns:
-    all_data = all_data.rename(columns={"ano_y": "ano"})
+all_data = pd.merge(
+    df_treino,
+    dados_ies_tratado,
+    on=["id_ies", "ano"],
+    how="left",
+)
 
 # Filtra para manter apenas IES com número de cursos válido e nome não nulo
 all_data = all_data[
-    (all_data["numero_cursos"].astype(float) > 0) & (all_data["nome_ies"].notnull())
+    (pd.to_numeric(all_data["numero_cursos"], errors="coerce") > 0)
+    & (all_data["nome_ies"].notnull())
 ]
 
 # Normaliza textos
-all_data["nome_curso"] = all_data["nome_curso"].str.upper()
-all_data["nome_ies"] = all_data["nome_ies"].str.upper()
+all_data["nome_curso"] = all_data["nome_curso"].astype(str).str.upper()
+all_data["nome_ies"] = all_data["nome_ies"].astype(str).str.upper()
 
 # Converte colunas numéricas principais, se existirem
 for col in ["concluintes", "ingressantes", "inscritos_totais", "vagas_totais"]:
     if col in all_data.columns:
-        all_data[col] = all_data[col].astype("Int64")
+        all_data[col] = pd.to_numeric(all_data[col], errors="coerce").astype("Int64")
 
 # Remapeia 'cat_adm' e 'modalidade_ensino' para rótulos legíveis
 all_data["cat_adm"] = (
@@ -170,6 +267,7 @@ duracoes = {
     "MEDICINA": 6,
     "DIREITO": 5,
     "ADMINISTRAÇÃO": 4,
+    "Ciência da Computação": 4,
 }
 
 
@@ -181,7 +279,6 @@ def calcular_metricas(df: pd.DataFrame, curso: str, duracao: int) -> pd.DataFram
         col_conclusao = f"taxa_conclusao_{ano}"
         col_evasao = f"taxa_evasao_{ano}"
         if col_ing in df_course.columns and col_con in df_course.columns:
-            # Evitar divisão por zero e valores não definidos
             df_course[col_conclusao] = df_course[col_con] / df_course[col_ing]
             df_course[col_evasao] = 1 - df_course[col_conclusao]
         else:
@@ -190,10 +287,16 @@ def calcular_metricas(df: pd.DataFrame, curso: str, duracao: int) -> pd.DataFram
     return df_course
 
 
-df_eng = calcular_metricas(ingress_wide, "ENGENHARIA CIVIL", duracoes["ENGENHARIA CIVIL"])
+df_eng = calcular_metricas(
+    ingress_wide, "ENGENHARIA CIVIL", duracoes["ENGENHARIA CIVIL"]
+)
 df_dir = calcular_metricas(ingress_wide, "DIREITO", duracoes["DIREITO"])
 df_med = calcular_metricas(ingress_wide, "MEDICINA", duracoes["MEDICINA"])
 df_adm = calcular_metricas(ingress_wide, "ADMINISTRAÇÃO", duracoes["ADMINISTRAÇÃO"])
+df_cc = calcular_metricas(
+    ingress_wide, "CIÊNCIA DA COMPUTAÇÃO", duracoes["Ciência da Computação"]
+)
+
 
 # Função para converter data frame wide em long para um dado prefixo e rótulo
 def pivot_long_metric(df: pd.DataFrame, prefix: str, label: str) -> pd.DataFrame:
@@ -204,7 +307,7 @@ def pivot_long_metric(df: pd.DataFrame, prefix: str, label: str) -> pd.DataFrame
         var_name="ano",
         value_name="taxa",
     )
-    df_long["ano"] = df_long["ano"].str.extract(r"(\d{4})")
+    df_long["ano"] = df_long["ano"].astype(str).str.extract(r"(\d{4})")
     df_long["tipo"] = label
     return df_long
 
@@ -225,6 +328,11 @@ medicina_long = pd.concat([med_long_conclusao, med_long_evasao])
 adm_long_conclusao = pivot_long_metric(df_adm, "taxa_conclusao_", "Taxa de Conclusão")
 adm_long_evasao = pivot_long_metric(df_adm, "taxa_evasao_", "Taxa de Evasão")
 administracao_long = pd.concat([adm_long_conclusao, adm_long_evasao])
+
+cc_long_conclusao = pivot_long_metric(df_cc, "taxa_conclusao_", "Taxa de Conclusão")
+cc_long_evasao = pivot_long_metric(df_cc, "taxa_evasao_", "Taxa de Evasão")
+computacao_long = pd.concat([cc_long_conclusao, cc_long_evasao])
+
 
 # =============================================================================
 # Plotagem com Plotly – duas linhas: uma para "Taxa de Conclusão" (verde)
@@ -250,31 +358,49 @@ plot_taxa(eng_civil_long, "Engenharia Civil")
 plot_taxa(direito_long, "Direito")
 plot_taxa(medicina_long, "Medicina")
 plot_taxa(administracao_long, "Administração")
-
+plot_taxa(computacao_long, "Ciência da Computação")
 # =============================================================================
 # Exportação dos dados processados para uso em outros scripts / notebooks
 # =============================================================================
-
 ingress_wide.to_csv(
-    os.path.join(PASTA_PROCESSADO, "final_ingressantes.csv"), index=False, sep=";"
+    os.path.join(PASTA_PROCESSADO, "final_ingressantes.csv"),
+    index=False,
+    sep=";",
+    encoding="utf-8",
 )
 df_eng.to_csv(
-    os.path.join(PASTA_PROCESSADO, "final_eng_civil.csv"), index=False, sep=";"
+    os.path.join(PASTA_PROCESSADO, "final_eng_civil.csv"),
+    index=False,
+    sep=";",
+    encoding="utf-8",
 )
 df_dir.to_csv(
-    os.path.join(PASTA_PROCESSADO, "final_direito.csv"), index=False, sep=";"
+    os.path.join(PASTA_PROCESSADO, "final_direito.csv"),
+    index=False,
+    sep=";",
+    encoding="utf-8",
 )
 df_med.to_csv(
-    os.path.join(PASTA_PROCESSADO, "final_medicina.csv"), index=False, sep=";"
+    os.path.join(PASTA_PROCESSADO, "final_medicina.csv"),
+    index=False,
+    sep=";",
+    encoding="utf-8",
 )
 df_adm.to_csv(
-    os.path.join(PASTA_PROCESSADO, "final_administracao.csv"), index=False, sep=";"
+    os.path.join(PASTA_PROCESSADO, "final_administracao.csv"),
+    index=False,
+    sep=";",
+    encoding="utf-8",
+)
+df_cc.to_csv(
+    os.path.join(PASTA_PROCESSADO, "final_computacao.csv"),
+    index=False,
+    sep=";",
+    encoding="utf-8",
 )
 
 # =============================================================================
-# Auditoria após filtros básicos (exemplo: EDA sobre subconjunto filtrado)
+# Auditoria após filtros básicos
 # =============================================================================
-# Aqui usamos uma cópia do df_eda; você pode substituir por um subconjunto específico
-# caso aplique filtros adicionais na análise exploratória.
 df_filtrado = df_eda.copy()
 auditar_df(df_filtrado, etapa="analises", contexto="apos_filtros_basicos", n=5)

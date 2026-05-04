@@ -1,4 +1,4 @@
-# scripts/utils/inspecao.py
+# src/evasao/utils/inspecao.py
 
 from __future__ import annotations
 import os

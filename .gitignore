@@ -1,101 +1,321 @@
+# !requirements.txt
+# # ============================
+# # Dados e arquivos sensíveis (NÃO VERSIONAR)
+# # ============================
+# # dados/
+# # modelos/
+# dados/bruto/
+# dados/intermediario/
+# resultados/
+# relatorios/
+# documentos/graficos/
+# notebooks/
+# acessibilidade_web/graficos/
+
+# # Não versionar microdados, CSVs e textos derivados
+# # *.csv
+# # *.txt
+# dados/bruto/*.csv
+# dados/bruto/*.zip
+# dados/intermediario/*.csv
+
+# # PDFs grandes, relatórios finais, TCC etc.
+# # *.pdf
+
+# # Logs e arquivos temporários
+# *.log
+# log_erros.txt
+# *.tmp
+# *.zip
+# *.tar.gz
+
+# # ============================
+# # Modelos e artefatos treinados
+# # ============================
+# # *.pkl
+# *.h5
+
+# # ============================
+# # Ambientes virtuais e configs de ambiente
+# # ============================
+# .venv/
+# env/
+# ambiente/.venv/
+# ambiente/ambiente.yml
+# # ambiente/requirements.txt
+# .env
+
+# # ============================
+# # Notebooks e checkpoints
+# # ============================
+# .ipynb_checkpoints/
+
+# # ============================
+# # Arquivos do sistema operacional
+# # ============================
+# .DS_Store
+# .Trash/
+# Thumbs.db
+
+# # ============================
+# # Arquivos temporários e de backup
+# # ============================
+# *~
+# *.swp
+# *.swo
+
+# # ============================
+# # Caches e compilados Python
+# # ============================
+# __pycache__/
+# *.py[cod]
+# *$py.class
+
+# # ============================
+# # Configurações de IDEs/editores
+# # ============================
+# .vscode/
+# *.sublime-project
+# *.sublime-workspace
+# .Rproj.user
+# *.Rproj
+# # ============================
+# # CSVs de dados_processado não usados pelo app Streamlit
+# # ============================
+
+# # Ignora todos os CSVs processados...
+# dados/processado/dados_cursos_*.csv
+# dados/processado/dados_ies_*.csv
+# dados/processado/dados_cursos_tratado_*.csv
+# dados/processado/dados_ies_tratado_*.csv
+
+# # ...EXCETO os que o app_evasao.py realmente consome em produção
+# !dados/processado/dados_ingresso_evasao_conclusao.csv
+# !dados/processado/final_administracao.csv
+# !dados/processado/final_direito.csv
+# !dados/processado/final_eng_civil.csv
+# !dados/processado/final_medicina.csv
+# !dados/processado/final_ingressantes.csv
+# !dados/processado/dados_cursos_serie_temporal.csv
+# modelos/modelos_salvos/
+# *.pkl
+
 !requirements.txt
-# ============================
-# Dados e arquivos sensíveis (NÃO VERSIONAR)
-# ============================
-# dados/
-# modelos/
+
+# =========================================================
+# DATASETS E PIPELINE DE DADOS
+# =========================================================
+
+# Dados brutos e intermediários (regeráveis pelo pipeline)
 dados/bruto/
 dados/intermediario/
-resultados/
-relatorios/
-documentos/graficos/
-notebooks/
-acessibilidade_web/graficos/
+dados/tmp/
+dados/cache/
 
-# Não versionar microdados, CSVs e textos derivados
-# *.csv
-# *.txt
-dados/bruto/*.csv
-dados/bruto/*zip
-dados/intermediario/*.csv
+# Dados processados grandes
+dados/processado/*.csv
+dados/processado/*.parquet
+dados/processado/*.feather
 
-# PDFs grandes, relatórios finais, TCC etc.
-# *.pdf
-
-# Logs e arquivos temporários
-*.log
-log_erros.txt
-*.tmp
-*.zip
-*.tar.gz
-
-# ============================
-# Modelos e artefatos treinados
-# ============================
-# *.pkl
-*.h5
-
-# ============================
-# Ambientes virtuais e configs de ambiente
-# ============================
-.venv/
-env/
-ambiente/.venv/
-ambiente/ambiente.yml
-# ambiente/requirements.txt
-.env
-
-# ============================
-# Notebooks e checkpoints
-# ============================
-.ipynb_checkpoints/
-
-# ============================
-# Arquivos do sistema operacional
-# ============================
-.DS_Store
-.Trash/
-Thumbs.db
-
-# ============================
-# Arquivos temporários e de backup
-# ============================
-*~
-*.swp
-*.swo
-
-# ============================
-# Caches e compilados Python
-# ============================
-__pycache__/
-*.py[cod]
-*$py.class
-
-# ============================
-# Configurações de IDEs/editores
-# ============================
-.vscode/
-*.sublime-project
-*.sublime-workspace
-.Rproj.user
-*.Rproj
-# ============================
-# CSVs de dados_processado não usados pelo app Streamlit
-# ============================
-
-# Ignora todos os CSVs processados...
-dados/processado/dados_cursos_*.csv
-dados/processado/dados_ies_*.csv
-dados/processado/dados_cursos_tratado_*.csv
-dados/processado/dados_ies_tratado_*.csv
-
-# ...EXCETO os que o app_evasao.py realmente consome em produção
-!dados/processado/dados_ingresso_evasao_conclusao.csv
+# Permitir apenas datasets usados diretamente no app Streamlit
 !dados/processado/final_administracao.csv
 !dados/processado/final_direito.csv
 !dados/processado/final_eng_civil.csv
 !dados/processado/final_medicina.csv
 !dados/processado/final_ingressantes.csv
+!dados/processado/dados_ingresso_evasao_conclusao.csv
 !dados/processado/dados_cursos_serie_temporal.csv
+
+# Ignorar CSVs auxiliares gerados pelo pipeline
+dados/processado/dados_cursos_*.csv
+dados/processado/dados_ies_*.csv
+dados/processado/dados_cursos_tratado_*.csv
+dados/processado/dados_ies_tratado_*.csv
+
+# =========================================================
+# MICRODADOS E ARQUIVOS GRANDES
+# =========================================================
+
+*.zip
+*.tar.gz
+*.7z
+*.rar
+*.gz
+
+dados/bruto/*.zip
+dados/bruto/*.csv
+
+downloads/
+data_raw/
+microdados/
+
+# =========================================================
+# MODELOS TREINADOS E ARTEFATOS
+# =========================================================
+
 modelos/modelos_salvos/
+modelos/resultados_modelos/
+!modelos/resultados_modelos/
+!modelos/resultados_modelos/comparacao_baselines_temporal.csv
+!modelos/resultados_modelos/comparacao_baselines_temporal.md
+!modelos/resultados_modelos/feature_importance_random_forest.csv
+!modelos/resultados_modelos/feature_importance_random_forest.md
+!modelos/resultados_modelos/metodologia_temporal_antileakage.md
+
 *.pkl
+*.joblib
+*.h5
+*.onnx
+*.model
+
+# Artefatos gerados por análise/modelagem
+modelos/resultados_modelos/*.png
+modelos/resultados_modelos/*.svg
+modelos/resultados_modelos/*.jpg
+
+# =========================================================
+# NOTEBOOKS
+# =========================================================
+
+notebooks/
+.ipynb_checkpoints/
+
+# =========================================================
+# AMBIENTES PYTHON
+# =========================================================
+
+.venv/
+venv/
+env/
+ENV/
+ambiente/.venv/
+
+.python-version
+ambiente/ambiente.yml
+
+.env
+.env.local
+.env.production
+
+# =========================================================
+# CACHE PYTHON
+# =========================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =========================================================
+# LOGS
+# =========================================================
+
+*.log
+logs/
+log_erros.txt
+
+# =========================================================
+# STREAMLIT
+# =========================================================
+
+.streamlit/secrets.toml
+
+# =========================================================
+# RELATÓRIOS E DOCUMENTOS PESADOS
+# =========================================================
+
+relatorios/
+documentos/graficos/
+
+*.pdf
+*.pptx
+
+# =========================================================
+# TEST OUTPUTS
+# =========================================================
+
+coverage/
+htmlcov/
+
+# =========================================================
+# BACKUPS / TEMP
+# =========================================================
+
+*~
+*.tmp
+*.swp
+*.swo
+
+# =========================================================
+# ARQUIVOS DE SISTEMA
+# =========================================================
+
+.DS_Store
+.Trash/
+Thumbs.db
+
+# =========================================================
+# IDEs / EDITORES
+# =========================================================
+
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.Rproj.user
+*.Rproj
+
+# =========================================================
+# CACHE DE PIPELINE
+# =========================================================
+
+pipeline_cache/
+tmp/
+cache/
+
+# datasets
+dados/bruto/
+dados/intermediario/
+
+# modelos
+modelos/modelos_salvos/*.pkl
+
+# logs
+modelos/logs/
+
+# python
+__pycache__/
+*.pyc
+
+# mac
+.DS_Store
+
+# zip
+*.zip
+
+# =========================================================
+# SEGURANCA DE COMMIT - ARQUIVOS GRANDES/SENSIVEIS
+# =========================================================
+
+# CSVs processados grandes detectados localmente
+dados/processado/dados_cursos_serie_temporal.csv
+dados/processado/dados_ingresso_evasao_conclusao.csv
+dados/processado/dados_modelagem_temporal_sbie.csv
+
+# Backups locais
+*.bak
+*.backup
+
+# Credenciais e bancos locais
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+*.duckdb

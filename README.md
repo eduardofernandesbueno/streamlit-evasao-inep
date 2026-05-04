@@ -4,7 +4,7 @@ This repository presents a complete application for predicting academic dropout 
 
 Objective
 
-Develop a practical application that incorporates at least one machine learning algorithm studied in the course (regression, classification, or ensembles). The goal is to apply data science techniques to estimate dropout rates in on-campus courses using INEP/MEC microdata and present the results through a user-friendly interface. In this implementation the base model is a Random Forest, but the pipeline allows testing other algorithms (Linear Regression, Feature_Based) as required.
+Develop a practical application that incorporates at least one machine learning algorithm studied in the course (regression, classification, or ensembles). The goal is to apply data science techniques to estimate dropout rates in on-campus courses using INEP/MEC microdata and present the results through a user-friendly interface. In this implementation, Random Forest is the main model and is compared with explicit temporal baselines: historical mean, persistence, and Linear Regression.
 
 Main Folder Structure
 ├── dados/                     # Datasets used in the project
@@ -13,7 +13,7 @@ Main Folder Structure
 │   └── intermediario/         # Temporary intermediate data
 ├── modelos/                   # Trained models and saved evaluation metrics
 ├── notebooks/                 # Jupyter notebooks (optional)
-├── scripts/                   # Python scripts for the entire pipeline
+├── src/evasao/                   # Python scripts for the entire pipeline
 │   ├── analises/              # Exploratory analyses and validation routines
 │   ├── auditoria/             # Structural checks, logging, inspection tools
 │   ├── coleta_dados/          # INEP microdata retrieval and download automation
@@ -28,7 +28,7 @@ Main Folder Structure
 ├── requirements.txt             # Project dependency list
 └── README.md                  # Main project documentation
 
-Here is the requested translation into U.S. English. All folder and script names (e.g., requirements.txt, scripts/coleta_dados/coleta_dados_oficiais.py) have been preserved in Portuguese as instructed.
+Here is the requested translation into U.S. English. All folder and script names (e.g., requirements.txt, src/evasao/coleta_dados/coleta_dados_oficiais.py) have been preserved in Portuguese as instructed.
 
 ⸻
 
@@ -38,8 +38,8 @@ Dependencies
 	•	Modeling and visualization libraries: pandas, numpy, scikit-learn, seaborn, matplotlib
 	•	tensorflow/keras (optional) for neural networks
 	•	See the requirements.txt file for the complete list. Install dependencies with:
-	python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv
+source /Users/eddieferb/streamlit-evasao-inep/.venv/bin/activate
 pip install -r requirements.txt
 
 
@@ -49,28 +49,28 @@ Project Pipeline
 ## Execution Pipeline
 
 1. Collect official INEP links  
-   `python scripts/coleta_dados/coletar_links_inep.py`
+   `python src/evasao/coleta_dados/coletar_links_inep.py`
 
 2. Download and organize microdata  
-   `python scripts/coleta_dados/coleta_dados_oficiais.py`
+   `python src/evasao/coleta_dados/coleta_dados_oficiais.py`
 
 3. Preprocess and standardize variables  
-   `python scripts/processamento_dados/pre_processamento.py`
+   `python src/evasao/processamento_dados/pre_processamento.py`
 
 4. Clean data and generate final datasets
-   `python scripts/processamento_dados/tratar_dados.py`
+   `python src/evasao/processamento_dados/tratar_dados.py`
 
 5. Exploratory data analysis  
-   `python scripts/analises/analises.py`
+   `python src/evasao/analises/analises.py`
 
 6. Train prediction models  
-   `python scripts/modelagem/randomforest.py`
+   `python src/evasao/modelagem/randomforest.py`
 
 7. Generate charts for the report
-   `python scripts/visualizacao/gerar_graficos.py`
+   `python src/evasao/visualizacao/gerar_graficos.py`
 
 8. Launch Streamlit dashboard 
-   `streamlit run scripts/dashboard/app_evasao.py`
+   `/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py`
 
 ⸻
 
@@ -78,59 +78,60 @@ Run the end-to-end pipeline (Orchestrator script)
 
 Execute the complete pipeline (data collection, preprocessing, modeling, and visualization) using the orchestrator script. Ensure the virtual environment is activated and dependencies from requirements.txt are installed before running.
 
-Activate the virtual environment:
-   `source .venv/bin/activate`
+Activate the virtual environment from any folder:
+   `source /Users/eddieferb/streamlit-evasao-inep/.venv/bin/activate`
 
 Run the orchestrator:
-   `python scripts/rodar_pipeline.py`
+   `/Users/eddieferb/streamlit-evasao-inep/.venv/bin/python /Users/eddieferb/streamlit-evasao-inep/src/evasao/rodar_pipeline.py`
 
 Then, run manually Launch Streamlit dashboard 
-   `streamlit run scripts/dashboard/app_evasao.py`
+   `/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py`
 
 ⸻
 
 1. Microdata Collection
-The official INEP microdata (2009–2024) are downloaded directly from public sources using the script scripts/coleta_dados/coleta_dados_oficiais.py.
+The official INEP microdata (2009–2024) are downloaded directly from public sources using the script src/evasao/coleta_dados/coleta_dados_oficiais.py.
 This script creates the folder structure under dados/bruto/ and stores the CSV files corresponding to annual censuses.
 This collection step needs to be executed only once:
-python scripts/coleta_dados/coletar_links_inep.py
-python scripts/coleta_dados/coleta_dados_oficiais.py
+python src/evasao/coleta_dados/coletar_links_inep.py
+python src/evasao/coleta_dados/coleta_dados_oficiais.py
 
 2. Preprocessing and Exploratory Analysis
 Preprocessing involves cleaning and standardizing the data, selecting only on-campus programs, and consolidating key variables.
-Run the script scripts/processamento/pre_processamento.py to unify the years and generate processed files under dados/processado/:
-python scripts/processamento/pre_processamento.py
-scripts/processamento_dados/processamento_dados/tratar_dados.py
+Run the script src/evasao/processamento_dados/pre_processamento.py to unify the years and generate processed files under dados/processado/:
+python src/evasao/processamento_dados/pre_processamento.py
+python src/evasao/processamento_dados/tratar_dados.py
 
 This step includes:
-	•	Selection of relevant columns (e.g. taxa_ingresso, taxa_conclusao, taxa_evasao, vagas_totais)
+	•	Selection of relevant columns for descriptive analysis and temporal modeling (e.g. vagas_totais, inscritos_totais, ingressantes, matriculados, concluintes)
 	•	Handling of missing values and type conversions
 	•	Generation of dados_cursos_tratado.csv and dados_ies_tratado.csv for modeling
 	•	Basic exploratory analysis (histograms, heatmaps), optionally via Jupyter notebooks
 
 3. Data Splitting and Feature Engineering
-The scripts under the folder scripts/processamento allow preparing various input sets.
-For example, for Transfer Learning or combining additional features (media_geral, taxa_ingresso, taxa_conclusao).
-For the Streamlit project, it is recommended to start with the variables taxa_ingresso and taxa_conclusao to predict taxa_evasao.
+The scripts under the folder src/evasao/processamento allow preparing temporal input sets.
+For the Streamlit project, the current modeling dataset uses features observed in year t
+(`ingressantes_t`, `concluintes_t`, `matriculados_t`, `vagas_totais_t`, `inscritos_totais_t`)
+to estimate the future target `taxa_evasao_alvo` in year t+1. The contemporaneous rates
+`taxa_conclusao` and `taxa_evasao` are descriptive variables and must not be used as input
+features to predict same-year dropout, because that would reconstruct a direct formula.
 
 4. Modeling
 Train the machine learning models by running the modeling scripts:
-	•	Original model (Random Forest + Linear Regression) — scripts/modelagem/randomforest.py
-	•	Model with feature engineering (Random Forest) — scripts/modelagem/feature_based.py.py
-	•	Model with neural network fine-tuning (ANN) — scripts/modelagem/treinamento_modelo_Fine-tuning.py (optional)
-	•	C4.5/J48 decision tree model — scripts/modelagem/treinamento_modelo_C4.5_Tree_J48.py (evaluated as an alternative)
+	•	Temporal baselines and Random Forest — src/evasao/modelagem/randomforest.py
 
-These scripts split the dataset into training and testing subsets, train the models, and log the metrics (MSE, R²) under modelos/resultados_modelos/.
-By default, scripts/modelagem/randomforest.py compares Linear Regression with Random Forest and saves the best model.
+The current modeling pipeline uses temporal validation: features observed in year t are used to predict `taxa_evasao_alvo` in year t+1. The holdout split uses `ano_base <= 2018` for training and `ano_base > 2018` for testing. Variables directly derived from the future target, such as `taxa_conclusao_alvo`, must not enter X.
+
+The script src/evasao/modelagem/randomforest.py compares historical mean, persistence (`taxa_evasao_t`), Linear Regression, and Random Forest on the same temporal holdout. It saves the metrics table and the Random Forest feature importance ranking under modelos/resultados_modelos/.
 You can adjust the hyperparameters directly in the scripts or through the Streamlit panel.
 
 5. Evaluation and Visualization
-Use scripts/visualizacao/gerar_graficos.py to generate evolution curves of enrollment, completion, and dropout rates, as well as confusion matrices and model comparisons.
+Use src/evasao/visualizacao/gerar_graficos.py to generate evolution curves of enrollment, completion, and dropout rates, as well as confusion matrices and model comparisons.
 The metrics are saved as PNG files under modelos/resultados_modelos/.
-For temporal validation and course-specific comparisons, run scripts/analises/validar_modelos_temporais.py and scripts/analises/comparar_predicoes_cursos.py.
+For temporal validation and course-specific comparisons, run src/evasao/analises/validar_modelos_temporais.py and src/evasao/analises/comparar_predicoes_cursos.py.
 
 6. Streamlit Interface
-The interactive application is implemented in app/app_evasao.py.
+The interactive application is implemented in src/evasao/dashboard/app_evasao.py.
 This panel loads the trained model and allows users to:
 	•	Select a course (e.g. Administration, Law, Civil Engineering, Medicine) for analysis
 	•	Adjust hyperparameters of the Random Forest model via sliders and drop-down menus (e.g. number of trees n_estimators, maximum depth max_depth, and criterion) — using st.slider and st.selectbox
@@ -138,7 +139,7 @@ This panel loads the trained model and allows users to:
 	•	Plot line charts comparing actual vs. predicted rates over time
 
 To run the panel:
-streamlit run app/app_evasao.py
+/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py
 
 7. Video and Report
 For the final submission:
@@ -195,3 +196,33 @@ License
 
 Please see the LICENCA file for terms of use and distribution.
 
+Reproducing the experiments
+
+git clone repo
+cd streamlit-evasao-inep
+
+python -m venv .venv
+source /Users/eddieferb/streamlit-evasao-inep/.venv/bin/activate
+
+pip install -r requirements.txt
+
+/Users/eddieferb/streamlit-evasao-inep/.venv/bin/python /Users/eddieferb/streamlit-evasao-inep/src/evasao/rodar_pipeline.py
+
+
+---------------------------------
+Methodological note
+
+The modeling dataset for the Streamlit application is temporal. It uses features observed
+in year t to estimate `taxa_evasao_alvo` in year t+1, with temporal validation based on
+`ano_base <= 2018` for training and `ano_base > 2018` for testing.
+
+The target-inverse column `taxa_conclusao_alvo` is intentionally not persisted in
+`dados/processado/dados_modelagem_temporal_sbie.csv` and must not be used as a feature.
+Anti-leakage tests under `tests/` guard this contract.
+
+The modeling step writes audit artifacts under `modelos/resultados_modelos/`:
+
+- `comparacao_baselines_temporal.csv` and `.md`: historical mean, persistence,
+  Linear Regression, and Random Forest compared on the same temporal holdout;
+- `feature_importance_random_forest.csv` and `.md`: Random Forest feature ranking;
+- `metodologia_temporal_antileakage.md`: short methodological note for review.

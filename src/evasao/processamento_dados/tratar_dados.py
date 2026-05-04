@@ -2,25 +2,27 @@
 # Script responsável pelo carregamento, limpeza, tratamento e consolidação
 # de dados educacionais extraídos dos microdados do INEP/MEC.
 
-import os
-import sys
-import pandas as pd
-from pathlib import Path
-import re
 import glob
-import numpy as np
+import os
+import re
+import sys
+from pathlib import Path
 
-# Garante que a raiz do projeto esteja no sys.path para permitir imports do pacote scripts
+import numpy as np
+import pandas as pd
+
+# Garante que a raiz do projeto esteja no sys.path para permitir imports do pacote evasao
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from scripts.utils.inspecao import registrar_ambiente, auditar_csv
+from evasao.utils.inspecao import auditar_csv, registrar_ambiente
+from evasao.utils.paths import DADOS_INTERMEDIARIO, DADOS_PROCESSADO
 
 registrar_ambiente(etapa="tratar_dados", contexto="início")
 
 # Pasta onde o pre_processamento grava os CSVs padronizados
-PASTA_PROCESSADO = "./dados/processado"
+PASTA_PROCESSADO = str(DADOS_PROCESSADO)
 
 
 def carregar_dados(caminho_entrada: str) -> pd.DataFrame:
@@ -208,6 +210,109 @@ def ler_taxas_consolidadas() -> pd.DataFrame:
         raise ValueError(f"Erro ao ler o arquivo de taxas consolidadas: {e}")
 
 
+def gerar_dataset_modelagem_temporal_sbie() -> None:
+    """
+    Gera um dataset de modelagem temporal sem leakage contemporâneo.
+
+    Ideia:
+      - usa apenas variáveis do ano t como preditores
+      - define como alvo a taxa_evasao do ano t+1
+      - não usa concluintes/ingressantes/vagas do mesmo ano do alvo
+
+    Saída:
+      - dados/processado/dados_modelagem_temporal_sbie.csv
+    """
+    caminho_serie = os.path.join(PASTA_PROCESSADO, "dados_cursos_serie_temporal.csv")
+    if not os.path.exists(caminho_serie):
+        print("Arquivo de série temporal não encontrado. Dataset SBIE não foi gerado.")
+        return
+
+    df = pd.read_csv(caminho_serie, sep=";", encoding="utf-8", low_memory=False)
+
+    anos_disponiveis = sorted(
+        {
+            int(m.group(2))
+            for col in df.columns
+            if (m := re.match(r"^(ingressantes|concluintes|matriculados|vagas_totais|inscritos_totais)_(\d{4})$", col))
+        }
+    )
+
+    if len(anos_disponiveis) < 2:
+        print("Anos insuficientes para gerar dataset temporal SBIE.")
+        return
+
+    id_cols = [col for col in ["id_curso", "nome_curso", "modalidade_ensino", "id_ies"] if col in df.columns]
+    linhas_modelo: list[pd.DataFrame] = []
+
+    for ano in anos_disponiveis[:-1]:
+        prox_ano = ano + 1
+
+        col_ing_t = f"ingressantes_{ano}"
+        col_conc_t = f"concluintes_{ano}"
+        col_mat_t = f"matriculados_{ano}"
+        col_vagas_t = f"vagas_totais_{ano}"
+        col_insc_t = f"inscritos_totais_{ano}"
+
+        col_ing_y = f"ingressantes_{prox_ano}"
+        col_conc_y = f"concluintes_{prox_ano}"
+
+        if col_ing_y not in df.columns or col_conc_y not in df.columns:
+            continue
+
+        base_cols = id_cols.copy()
+        feat_map = {
+            col_ing_t: "ingressantes_t",
+            col_conc_t: "concluintes_t",
+            col_mat_t: "matriculados_t",
+            col_vagas_t: "vagas_totais_t",
+            col_insc_t: "inscritos_totais_t",
+        }
+
+        cols_existentes = base_cols + [c for c in feat_map if c in df.columns] + [col_ing_y, col_conc_y]
+        df_ano = df[cols_existentes].copy()
+        df_ano = df_ano.rename(columns=feat_map)
+        df_ano["ano_base"] = ano
+        df_ano["ano_alvo"] = prox_ano
+
+        df_ano["ingressantes_alvo"] = pd.to_numeric(df_ano[col_ing_y], errors="coerce")
+        df_ano["concluintes_alvo"] = pd.to_numeric(df_ano[col_conc_y], errors="coerce")
+
+        df_ano = df_ano[(df_ano["ingressantes_alvo"] > 0) & (df_ano["concluintes_alvo"] >= 0)]
+        taxa_conclusao_alvo = df_ano["concluintes_alvo"] / df_ano["ingressantes_alvo"]
+        df_ano["taxa_evasao_alvo"] = 1 - taxa_conclusao_alvo
+        df_ano = df_ano[(df_ano["taxa_evasao_alvo"] >= 0) & (df_ano["taxa_evasao_alvo"] <= 1)]
+
+        # remove colunas contemporâneas do alvo para evitar leakage
+        df_ano = df_ano.drop(
+            columns=[
+                col_ing_y,
+                col_conc_y,
+                "ingressantes_alvo",
+                "concluintes_alvo",
+                "taxa_conclusao_alvo",
+            ],
+            errors="ignore",
+        )
+
+        linhas_modelo.append(df_ano)
+
+    if not linhas_modelo:
+        print("Nenhuma linha válida para gerar o dataset temporal SBIE.")
+        return
+
+    df_modelo = pd.concat(linhas_modelo, ignore_index=True)
+
+    caminho_saida = os.path.join(PASTA_PROCESSADO, "dados_modelagem_temporal_sbie.csv")
+    salvar_dados_tratados(df_modelo, caminho_saida)
+    auditar_csv(
+        caminho_saida,
+        etapa="dataset_modelagem_temporal",
+        contexto="sbie_sem_leakage",
+        n=10,
+    )
+    print(f"[OK] Dataset temporal SBIE salvo em: {caminho_saida}")
+
+
 def main(year: int = 2024) -> None:
     """
     Fluxo de tratamento por ano:
@@ -219,8 +324,8 @@ def main(year: int = 2024) -> None:
     caminho_ies = os.path.join(PASTA_PROCESSADO, f"dados_ies_{year}.csv")
     caminho_cursos = os.path.join(PASTA_PROCESSADO, f"dados_cursos_{year}.csv")
 
-    caminho_ies_tratado = f"./dados/intermediario/dados_ies_tratado_{year}.csv"
-    caminho_cursos_tratado = f"./dados/intermediario/dados_cursos_tratado_{year}.csv"
+    caminho_ies_tratado = str(DADOS_INTERMEDIARIO / f"dados_ies_tratado_{year}.csv")
+    caminho_cursos_tratado = str(DADOS_INTERMEDIARIO / f"dados_cursos_tratado_{year}.csv")
 
     caminho_ies_final = os.path.join(PASTA_PROCESSADO, f"dados_ies_tratado_{year}.csv")
     caminho_cursos_final = os.path.join(PASTA_PROCESSADO, f"dados_cursos_tratado_{year}.csv")
@@ -294,8 +399,9 @@ if __name__ == "__main__":
         print(f"\n=== Tratando ano {year} ===")
         main(year)
 
-    # Gera série temporal e consolida taxas
+    # Gera série temporal, consolida taxas e cria dataset temporal sem leakage
     pivotar_dados_cursos()
     salvar_taxas_consolidadas()
     df_taxas = ler_taxas_consolidadas()
     print(df_taxas.head())
+    gerar_dataset_modelagem_temporal_sbie()

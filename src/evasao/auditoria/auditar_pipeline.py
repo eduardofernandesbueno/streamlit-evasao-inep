@@ -1,4 +1,4 @@
-# scripts/auditoria/auditar_pipeline.py
+# src/evasao/auditoria/auditar_pipeline.py
 
 from pathlib import Path
 import sys
@@ -10,7 +10,7 @@ BASE = Path(__file__).resolve().parents[2]  # ajusta se necessário
 if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
-from scripts.utils.inspecao import auditar_csv, registrar_ambiente
+from evasao.utils.inspecao import auditar_csv, registrar_ambiente
 
 
 def auditar_dados_brutos(anos):

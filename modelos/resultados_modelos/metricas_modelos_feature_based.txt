@@ -1,3 +1,9 @@
+LEGADO / NAO USAR COMO EVIDENCIA ATUAL SBIE-RBIE
+Este arquivo registra uma execucao historica anterior a reformulacao temporal
+anti-leakage. As metricas abaixo podem refletir reconstrucao deterministica do
+alvo e nao devem ser citadas como resultado metodologico atual. Para o artigo,
+usar comparacao_baselines_temporal.* e os diagnosticos temporais atuais.
+
 === REGRESSÃO — taxa_evasao ===
 MSE: 0.0000
 R² : 0.9999
@@ -21,4 +27,3 @@ Baixa evasão       0.98      0.97      0.97     46799
     accuracy                           0.98    143690
    macro avg       0.98      0.98      0.98    143690
 weighted avg       0.98      0.98      0.98    143690
-

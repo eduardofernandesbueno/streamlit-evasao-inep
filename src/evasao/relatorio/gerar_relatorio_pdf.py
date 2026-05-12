@@ -140,12 +140,12 @@ def gerar_relatorio():
         # Página final: Conclusão Analítica
         conclusoes = [
             "CONCLUSÃO GERAL",
-            "- Taxa de evasão: Alta na maioria dos cursos, picos extremos em 100%",
+            "- Taxa de evasão: Alta na maioria dos cursos, com casos extremos",
             "- Taxa de conclusão: Muito baixa em diversos cursos",
             "- Relação ingressantes/concluintes: Correlação positiva, mas dispersa",
             "- Modalidade de ensino: EAD com risco crítico de evasão",
             "- Taxa de ingresso: Variação acentuada na ocupação de vagas",
-            "- Modelagem: Regressão linear binária com 100% acurácia — revisar"
+            "- Modelagem atual: validação temporal anti-leakage com baselines"
         ]
         plt.figure(figsize=(8.5, 11))
         plt.axis('off')

@@ -1,25 +1,56 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 import joblib
-import numpy as np
 import pandas as pd
-from tensorflow.keras.models import load_model
-from sklearn.preprocessing import StandardScaler
 
-# Carregar modelo .pkl (Scikit-Learn)
-modelo_pkl = joblib.load('modelos/modelos_salvos/modelo_melhor_evasao.pkl')
 
-# Entrada de exemplo: taxa_ingresso, taxa_conclusao
-entrada = np.array([[0.45, 0.52]])
+ROOT = Path(__file__).resolve().parents[3]
+CAMINHO_MODELO = ROOT / "modelos" / "modelos_salvos" / "modelo_melhor_evasao.pkl"
 
-# Previsão com modelo .pkl
-pred_pkl = modelo_pkl.predict(entrada)
-print(f"Predição modelo .pkl: {pred_pkl[0]:.4f}")
+FEATURE_COLS = [
+    "ingressantes_t",
+    "concluintes_t",
+    "matriculados_t",
+    "vagas_totais_t",
+    "inscritos_totais_t",
+]
 
-# Carregar modelo .h5 (Keras)
-modelo_h5 = load_model('modelos/modelo_finetuned_tcc.h5')
 
-# Ajustar entrada para 3 colunas esperadas: media_geral (dummy), taxa_ingresso, taxa_conclusao
-entrada_nn = np.array([[0.0, entrada[0][0], entrada[0][1]]])
+def main() -> None:
+    """
+    Executa uma predicao pontual com o modelo temporal atual.
 
-# Previsão com modelo .h5
-pred_h5 = modelo_h5.predict(entrada_nn, verbose=0)
-print(f"Predição modelo .h5: {pred_h5[0][0]:.4f}")
+    Este script e apenas um exemplo auxiliar. Para o artigo SBIE/RBIE, o centro
+    metodologico permanece em src/evasao/modelagem/randomforest.py.
+    """
+    if not CAMINHO_MODELO.exists():
+        raise FileNotFoundError(
+            "Modelo temporal nao encontrado. Execute "
+            "`python -m src.evasao.modelagem.randomforest` antes deste exemplo."
+        )
+
+    modelo = joblib.load(CAMINHO_MODELO)
+
+    # Exemplo com variaveis observadas no ano-base t. Nao usar taxas
+    # contemporaneas de conclusao/evasao como features preditivas principais.
+    entrada = pd.DataFrame(
+        [
+            {
+                "ingressantes_t": 120.0,
+                "concluintes_t": 65.0,
+                "matriculados_t": 430.0,
+                "vagas_totais_t": 160.0,
+                "inscritos_totais_t": 980.0,
+            }
+        ],
+        columns=FEATURE_COLS,
+    )
+
+    predicao = float(modelo.predict(entrada)[0])
+    print(f"Predicao temporal de taxa_evasao_alvo em t+1: {predicao:.4f}")
+
+
+if __name__ == "__main__":
+    main()

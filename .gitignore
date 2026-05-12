@@ -165,6 +165,10 @@ modelos/resultados_modelos/
 !modelos/resultados_modelos/diagnostico_completude_temporal.md
 !modelos/resultados_modelos/diagnostico_balanceamento_classes.csv
 !modelos/resultados_modelos/diagnostico_balanceamento_classes.md
+!modelos/resultados_modelos/ablacao_sem_concluintes_t.csv
+!modelos/resultados_modelos/ablacao_sem_concluintes_t.md
+!modelos/resultados_modelos/validacao_rolling_expanding_temporal.csv
+!modelos/resultados_modelos/validacao_rolling_expanding_temporal.md
 
 *.pkl
 *.joblib

@@ -738,6 +738,13 @@ from evasao.modelagem.randomforest import treinar_modelos
 from evasao.utils.paths import DADOS_PROCESSADO
 
 CAMINHO_DADOS = DADOS_PROCESSADO / "dados_modelagem_temporal_sbie.csv"
+DIR_RESULTADOS_MODELOS = BASE_DIR / "modelos" / "resultados_modelos"
+CAMINHO_COMPARACAO_BASELINES = (
+    DIR_RESULTADOS_MODELOS / "comparacao_baselines_temporal.csv"
+)
+CAMINHO_DIAGNOSTICO_COMPLETUDE = (
+    DIR_RESULTADOS_MODELOS / "diagnostico_completude_temporal.csv"
+)
 ANO_LIMITE_TREINO = 2018
 FEATURE_COLS = [
     "ingressantes_t",
@@ -810,6 +817,24 @@ def preparar_base_temporal(
         )
 
     return df_model, df_treino, df_teste
+
+
+@st.cache_data(show_spinner=False)
+def carregar_comparacao_benchmark() -> pd.DataFrame | None:
+    if not CAMINHO_COMPARACAO_BASELINES.exists():
+        return None
+    return pd.read_csv(CAMINHO_COMPARACAO_BASELINES)
+
+
+@st.cache_data(show_spinner=False)
+def carregar_diagnostico_completude() -> pd.DataFrame | None:
+    if not CAMINHO_DIAGNOSTICO_COMPLETUDE.exists():
+        return None
+    return pd.read_csv(CAMINHO_DIAGNOSTICO_COMPLETUDE)
+
+
+def formatar_decimal(valor: float) -> str:
+    return f"{float(valor):.4f}".replace(".", ",")
 
 
 df_ref = load_reference_data()
@@ -938,8 +963,14 @@ else:
 # ===============================
 #  INTERFACE
 # ===============================
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["📘 Sobre", "📈 Predição Individual", "📊 Avaliação", "📁 Upload CSV"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    [
+        "📘 Sobre",
+        "🏛️ Benchmark SBIE",
+        "📈 Predição Individual",
+        "📊 Experimento interativo",
+        "📁 Upload CSV",
+    ]
 )
 
 # -------------------------------------------------------
@@ -1002,7 +1033,8 @@ O backend do App é composto por um pipeline em Python dividido em múltiplos sc
 ### Como usar este painel?
 
 - Use a aba **“📈 Predição Individual”** para testar um curso hipotético ou real e ver a evasão estimada.
-- Use a aba **“📊 Avaliação”** para inspecionar métricas, gráficos e comparar modelos.
+- Use a aba **“🏛️ Benchmark SBIE”** para consultar as métricas fixas do artigo.
+- Use a aba **“📊 Experimento interativo”** para inspecionar métricas recalculadas em runtime.
 - Use a aba **“📁 Upload CSV”** para gerar predições em lote para vários cursos ao mesmo tempo.
 """
     )
@@ -1019,9 +1051,140 @@ O backend do App é composto por um pipeline em Python dividido em múltiplos sc
         )
 
 # -------------------------------------------------------
-# TAB 2 — PREDIÇÃO INDIVIDUAL
+# TAB 2 — BENCHMARK SBIE
 # -------------------------------------------------------
 with tab2:
+    st.header("🏛️ Benchmark SBIE")
+
+    st.markdown(
+        """
+### Benchmark temporal com dados oficiais INEP/MEC
+
+Esta seção apresenta as métricas fixas do benchmark reportado no artigo. Os
+valores são lidos diretamente de `modelos/resultados_modelos/comparacao_baselines_temporal.csv`,
+sem retreinamento em runtime.
+
+- Predição da taxa de evasão em `t+1` a partir de variáveis observadas em `t`.
+- Validação temporal: treino com `ano_base <= 2018`; teste com `ano_base > 2018`.
+- O particionamento é temporal, não aleatório.
+"""
+    )
+
+    df_benchmark = carregar_comparacao_benchmark()
+
+    if df_benchmark is None:
+        st.error(
+            "Artefato do benchmark não encontrado: "
+            "modelos/resultados_modelos/comparacao_baselines_temporal.csv"
+        )
+    else:
+        mask_rf = df_benchmark.astype(str).apply(
+            lambda row: row.str.contains("Random Forest", case=False, na=False).any(),
+            axis=1,
+        )
+        rf_rows = df_benchmark[mask_rf]
+
+        if rf_rows.empty:
+            st.error("Linha Random Forest não encontrada no CSV do benchmark.")
+        else:
+            rf = rf_rows.iloc[0]
+
+            st.subheader("Métricas fixas do artigo")
+            col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+            col_b1.metric("R²", formatar_decimal(rf["r2"]))
+            col_b2.metric("MAE", formatar_decimal(rf["mae"]))
+            col_b3.metric("RMSE", formatar_decimal(rf["rmse"]))
+            col_b4.metric("MSE", formatar_decimal(rf["mse"]))
+
+            st.caption(
+                "As métricas classificatórias abaixo são auxiliares; a comparação "
+                "principal do artigo é regressiva."
+            )
+            col_b5, col_b6, col_b7, col_b8 = st.columns(4)
+            col_b5.metric("Accuracy", formatar_decimal(rf["accuracy"]))
+            col_b6.metric("Precision", formatar_decimal(rf["precision"]))
+            col_b7.metric("Recall", formatar_decimal(rf["recall"]))
+            col_b8.metric("F1", formatar_decimal(rf["f1"]))
+
+            st.subheader("Comparação de modelos no mesmo holdout temporal")
+            colunas_tabela = [
+                "modelo",
+                "ano_limite_treino",
+                "linhas_treino",
+                "linhas_teste",
+                "r2",
+                "mae",
+                "rmse",
+                "mse",
+                "accuracy",
+                "precision",
+                "recall",
+                "f1",
+            ]
+            st.dataframe(
+                df_benchmark[colunas_tabela],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.subheader("Contexto dos dados")
+            df_completude = carregar_diagnostico_completude()
+            registros_antes = None
+            registros_completos = None
+            if df_completude is not None:
+                registros_antes = int(df_completude["linhas_antes_dropna"].sum())
+                registros_completos = int(df_completude["linhas_apos_dropna"].sum())
+
+            info_dados = {
+                "Base": "dados/processado/dados_modelagem_temporal_sbie.csv",
+                "Registros antes de dropna": registros_antes,
+                "Registros completos após dropna": registros_completos,
+                "Treino": int(rf["linhas_treino"]),
+                "Teste": int(rf["linhas_teste"]),
+                "Anos-base de treino": "2009-2018",
+                "Anos-base de teste": "2019, 2021, 2022 e 2023",
+                "Anos-alvo correspondentes": "2020, 2022, 2023 e 2024",
+            }
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {"Item": chave, "Valor": valor}
+                        for chave, valor in info_dados.items()
+                        if valor is not None
+                    ]
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.subheader("Variáveis e alvo")
+            st.markdown(
+                """
+- Variáveis do modelo: `ingressantes_t`, `concluintes_t`, `matriculados_t`, `vagas_totais_t`, `inscritos_totais_t`.
+- Alvo: `taxa_evasao_alvo` em `t+1`.
+- Nota anti-leakage: o modelo principal não usa `taxa_evasao`, `taxa_conclusao` nem colunas derivadas diretamente do alvo como atributos preditivos.
+"""
+            )
+
+            st.info(
+                "As métricas desta aba são as métricas fixas do benchmark "
+                "reportado no artigo. Outras abas do app podem recalcular "
+                "modelos em runtime para fins exploratórios e didáticos, podendo "
+                "produzir valores diferentes."
+            )
+            st.markdown(
+                """
+Esta aplicação acompanha o artigo como artefato de evidência e apoio à
+reprodutibilidade metodológica. O objetivo não é afirmar superioridade universal
+do modelo, mas tornar auditável a formulação temporal, os dados agregados, as
+métricas e os baselines.
+"""
+            )
+
+# -------------------------------------------------------
+# TAB 3 — PREDIÇÃO INDIVIDUAL
+# -------------------------------------------------------
+with tab3:
     st.header("📈 Predição Individual")
 
     if modo == "custom" and st.session_state["modelo_custom"] is None:
@@ -1057,10 +1220,14 @@ with tab2:
         )
 
 # -------------------------------------------------------
-# TAB 3 — AVALIAÇÃO
+# TAB 4 — AVALIAÇÃO
 # -------------------------------------------------------
-with tab3:
-    st.header("📊 Avaliação do Modelo")
+with tab4:
+    st.header("📊 Métricas dinâmicas do app")
+    st.caption(
+        "Modelo recalculado em runtime para experimento interativo; estes valores "
+        "podem diferir das métricas fixas do artigo exibidas na aba Benchmark SBIE."
+    )
 
     if "ultimo_avaliado" not in st.session_state:
         st.session_state["ultimo_avaliado"] = None
@@ -1345,9 +1512,9 @@ with tab3:
             st.dataframe(df_comp)
 
 # -------------------------------------------------------
-# TAB 4 — CSV
+# TAB 5 — CSV
 # -------------------------------------------------------
-with tab4:
+with tab5:
     st.header("📁 Upload CSV")
 
     st.markdown(

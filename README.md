@@ -138,8 +138,24 @@ This panel loads the trained model and allows users to:
 	•	Display real-time metrics (MSE, R²) and a confusion matrix for binary classification (high vs. low dropout)
 	•	Plot line charts comparing actual vs. predicted rates over time
 
-To run the panel:
-/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py
+	To run the panel:
+	/Users/eddieferb/streamlit-evasao-inep/.venv/bin/streamlit run /Users/eddieferb/streamlit-evasao-inep/src/evasao/dashboard/app_evasao.py
+
+Streamlit Cloud
+
+Public URL:
+https://appevasao.streamlit.app/
+
+Main file path:
+src/evasao/dashboard/app_evasao.py
+
+Local command:
+streamlit run src/evasao/dashboard/app_evasao.py
+
+The "Benchmark SBIE" tab displays the fixed article metrics directly from
+`modelos/resultados_modelos/comparacao_baselines_temporal.csv`. Other app tabs
+may recalculate models at runtime for exploratory and didactic use, so their
+metrics can differ from the fixed benchmark reported in the article.
 
 7. Video and Report
 For the final submission:

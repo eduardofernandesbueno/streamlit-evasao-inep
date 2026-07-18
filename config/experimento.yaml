@@ -1,0 +1,89 @@
+projeto:
+  identificador: streamlit-evasao-inep
+  titulo_artigo: "Evasao no Ensino Superior brasileiro: Mapeamento Estruturado da Literatura em ML, EDM e LA, e Benchmark"
+  autores:
+    - Eduardo Fernandes Bueno
+    - Decio Wey Berti Junior
+    - Jacques Duilio Brancher
+  finalidade: >
+    Configuracao e documentacao publica do benchmark temporal associado aos
+    artefatos suplementares do artigo SBIE/CBIE 2026.
+
+dados:
+  origem: "Microdados publicos agregados do Censo da Educacao Superior/INEP/MEC"
+  recorte_temporal: "2009-2024"
+  arquivo_modelagem_principal: dados/processado/dados_modelagem_temporal_sbie.csv
+  observacao: >
+    Os dados brutos oficiais do INEP/MEC nao sao relicenciados por este
+    repositorio e devem ser obtidos nas fontes publicas oficiais quando nao
+    estiverem incluidos nos artefatos publicados.
+
+formulacao_temporal:
+  ano_base: ano_base
+  alvo: taxa_evasao_alvo
+  horizonte: "t+1"
+  treino: "ano_base <= 2018"
+  teste: "ano_base > 2018"
+  objetivo_preditivo: >
+    Usar variaveis observadas no ano t para prever a taxa de evasao no ano
+    alvo t+1, mantendo separacao temporal entre treino e teste.
+
+variaveis:
+  preditoras_principais:
+    - ingressantes_t
+    - concluintes_t
+    - matriculados_t
+    - vagas_totais_t
+    - inscritos_totais_t
+  excluidas_modelo_principal:
+    - nome: taxa_evasao
+      motivo: "risco de leakage ou derivacao contemporanea da evasao"
+    - nome: taxa_conclusao
+      motivo: "risco de leakage ou derivacao contemporanea da evasao"
+
+tratamento_ausentes:
+  criterio: "uso de observacoes completas"
+  imputacao_automatica: false
+  interpolacao_automatica: false
+  observacao: >
+    O experimento principal nao aplica imputacao ou interpolacao automatica.
+    O ano_base=2020 nao permaneceu apos o criterio de completude.
+
+modelos_e_baselines:
+  - media_historica_do_treino
+  - persistencia_temporal
+  - regressao_linear
+  - random_forest
+
+metricas:
+  regressivas_principais:
+    - R2
+    - MAE
+    - RMSE
+    - MSE
+  classificatorias_auxiliares:
+    - acuracia
+    - precisao
+    - recall
+    - F1
+  limiar_auxiliar_evasao_alta: 0.50
+  observacao: >
+    A leitura classificatoria alta/baixa evasao e auxiliar e deriva da taxa
+    continua prevista; a avaliacao principal do benchmark e regressiva.
+
+saidas:
+  diretorio_resultados_modelos: modelos/resultados_modelos/
+  artefatos_esperados:
+    - comparacao_baselines_temporal
+    - metricas_modelos
+    - diagnostico_completude_temporal
+    - diagnostico_balanceamento_classes
+
+controles_metodologicos:
+  data_leakage: >
+    Variaveis contemporaneas derivadas diretamente da evasao ou conclusao nao
+    devem entrar como atributos preditivos do modelo principal.
+  disponibilidade_publica: >
+    Este arquivo documenta criterios, variaveis, divisao temporal, metricas e
+    saidas consolidadas para transparencia e auditabilidade dos artefatos
+    suplementares.

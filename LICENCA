@@ -1,14 +1,71 @@
-	•	Autor: Eduardo Fernandes Bueno
-	•	E-mail: buenoeduardo@hotmail.com
+LICENCA DOS ARTEFATOS PUBLICOS
 
-    ---
+Repositorio: streamlit-evasao-inep
+Artigo: "Evasao no Ensino Superior brasileiro: Mapeamento Estruturado da Literatura em ML, EDM e LA, e Benchmark"
+Autores: Eduardo Fernandes Bueno; Decio Wey Berti Junior; Jacques Duilio Brancher.
 
-## **2. LICENCA**
+Este repositorio disponibiliza artefatos cientificos associados ao artigo acima,
+com finalidade academica, cientifica e de reprodutibilidade metodologica. A
+licenca publica dos materiais e dual, conforme a natureza de cada componente.
 
-**Caminho:** `informacao/LICENCA`
+1. Documentos e resultados agregados
 
-**Descrição:** Arquivo de licença do projeto.
+Documentos, protocolo, conducao, relato, planilha de extracao, evidencias,
+figuras documentais e resultados agregados derivados sao disponibilizados sob a
+licenca Creative Commons Attribution 4.0 International (CC BY 4.0).
 
-```text
-[Escolha uma licença apropriada para o seu projeto, como MIT, Apache 2.0 ou GPLv3, e insira o texto completo da licença aqui.]
+Voce pode compartilhar e adaptar esses materiais, inclusive para fins
+academicos, desde que atribua credito apropriado aos autores, indique mudancas
+quando aplicavel e preserve referencias ao artigo e ao repositorio.
 
+Texto da licenca CC BY 4.0:
+https://creativecommons.org/licenses/by/4.0/
+
+2. Scripts, configuracoes e componentes de codigo
+
+Scripts, arquivos de configuracao e componentes de codigo eventualmente
+disponibilizados neste repositorio sao licenciados sob a MIT License:
+
+MIT License
+
+Copyright (c) 2026 Eduardo Fernandes Bueno
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+3. Dados brutos oficiais do INEP/MEC
+
+Os dados brutos oficiais do INEP/MEC nao sao relicenciados por este
+repositorio. Eles permanecem sujeitos as condicoes de disponibilizacao do orgao
+de origem. Quando nao incluidos neste repositorio, devem ser obtidos diretamente
+nas fontes publicas oficiais do INEP/MEC.
+
+4. Componentes internos e escopo da publicacao
+
+Componentes internos de implementacao vinculados a projeto institucional,
+quando nao publicados neste repositorio, nao fazem parte do escopo desta
+licenca publica. Os materiais publicos descrevem procedimentos, variaveis,
+criterios de filtragem, divisao temporal, metricas e resultados consolidados
+para fins de transparencia e auditabilidade.
+
+5. Ausencia de garantia
+
+Os artefatos sao disponibilizados para fins academicos, cientificos e de
+reprodutibilidade metodologica, sem garantia de adequacao a uso operacional,
+decisorio ou institucional. O uso, interpretacao e eventual adaptacao dos
+materiais sao de responsabilidade de seus usuarios.

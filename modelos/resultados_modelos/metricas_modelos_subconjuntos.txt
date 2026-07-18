@@ -12,25 +12,3 @@ Matriz de confusão:
  [   28 79763]]
 ----------------------------------------------------------------------
 
-Subconjunto: fluxo_academico
-Features: ['ingressantes_t', 'matriculados_t', 'concluintes_t']
-Regressão Linear  -> MSE: 0.0684, R²: 0.1607
-Random Forest     -> MSE: 0.0582, R²: 0.2864
-Melhor modelo: Random Forest
-Classificação binária (threshold 0.50) -> Acurácia: 0.7292, Precisão: 0.8043, Recall: 0.8223, F1: 0.8132
-Matriz de confusão:
-[[15573 15964]
- [14182 65609]]
-----------------------------------------------------------------------
-
-Subconjunto: geral_compacto
-Features: ['ingressantes_t', 'concluintes_t', 'matriculados_t', 'vagas_totais_t', 'inscritos_totais_t']
-Regressão Linear  -> MSE: 0.0685, R²: 0.1595
-Random Forest     -> MSE: 0.0543, R²: 0.3337
-Melhor modelo: Random Forest
-Classificação binária (threshold 0.50) -> Acurácia: 0.7404, Precisão: 0.8095, Recall: 0.8342, F1: 0.8216
-Matriz de confusão:
-[[15870 15667]
- [13232 66559]]
-----------------------------------------------------------------------
-

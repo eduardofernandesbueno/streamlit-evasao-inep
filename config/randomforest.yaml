@@ -1,0 +1,59 @@
+modelo:
+  nome: RandomForestRegressor
+  biblioteca: scikit-learn
+  tarefa: regressao
+  alvo: taxa_evasao_alvo
+
+dados:
+  arquivo_modelagem_principal: dados/processado/dados_modelagem_temporal_sbie.csv
+  ano_base: ano_base
+  horizonte: "t+1"
+
+features:
+  preditoras:
+    - ingressantes_t
+    - concluintes_t
+    - matriculados_t
+    - vagas_totais_t
+    - inscritos_totais_t
+  excluidas:
+    - nome: taxa_evasao
+      motivo: "variavel contemporanea com risco de leakage ou derivacao da evasao"
+    - nome: taxa_conclusao
+      motivo: "variavel contemporanea com risco de leakage ou derivacao da evasao"
+
+validacao_temporal:
+  treino: "ano_base <= 2018"
+  teste: "ano_base > 2018"
+  observacao: >
+    A separacao temporal busca avaliar predicao futura, usando atributos em t
+    para prever taxa_evasao_alvo em t+1.
+
+hiperparametros:
+  n_estimators: 100
+  max_depth: null
+  min_samples_split: 2
+  min_samples_leaf: 1
+  random_state: 42
+
+avaliacao:
+  principal:
+    tipo: regressiva
+    metricas:
+      - R2
+      - MAE
+      - RMSE
+      - MSE
+  auxiliar:
+    tipo: classificatoria
+    aplicabilidade: "apenas para leitura auxiliar alta/baixa evasao"
+    limiar_evasao_alta: 0.50
+    metricas:
+      - acuracia
+      - precisao
+      - recall
+      - F1
+
+observacao_metodologica: >
+  Esta configuracao busca reduzir o risco de data leakage ao impedir o uso de
+  variaveis contemporaneas derivadas da evasao como atributos preditivos.

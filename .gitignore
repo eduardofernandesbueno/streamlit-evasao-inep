@@ -125,6 +125,7 @@ dados/processado/*.feather
 !dados/processado/final_ingressantes.csv
 !dados/processado/dados_ingresso_evasao_conclusao.csv
 !dados/processado/dados_cursos_serie_temporal.csv
+!dados/processado/dados_modelagem_temporal_sbie.csv
 
 # Ignorar CSVs auxiliares gerados pelo pipeline
 dados/processado/dados_cursos_*.csv
@@ -312,7 +313,6 @@ __pycache__/
 # CSVs processados grandes detectados localmente
 dados/processado/dados_cursos_serie_temporal.csv
 dados/processado/dados_ingresso_evasao_conclusao.csv
-dados/processado/dados_modelagem_temporal_sbie.csv
 
 # Backups locais
 *.bak
